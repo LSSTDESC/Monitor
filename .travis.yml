@@ -13,5 +13,5 @@ install:
 #
 # Command to run tests:
 # script: nosetests
-# script: python tests/test_Monitor.py # Jim will need to uncomment this 
+script: python tests/test_Monitor.py # Jim will need to uncomment this 
 script: echo "It's all good."
