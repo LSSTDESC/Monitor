@@ -12,5 +12,6 @@ install:
   - source setup/setup.sh
 #
 # Command to run tests:
-script: nosetests
-script: echo "It's all good."
+script:
+  - nosetests
+  - echo "It's all good."
