@@ -3,6 +3,13 @@
 
 Extracts the light curves of ("monitors") all time-variable objects of cosmological interest. The basic concept is a general purpose light curve extraction tool, that can be sub-classed to specialize in supernova monitoring or lensed quasar monitoring. In an ideal world, this code would merely take care of the book-keeping involved in assembling light curves in the appropriate format for modeling codes like `SNCosmo` and `SLTimer` by simply querying the various DM Level 2 databases. However, we are aware of the possibility that we may need to implement multi-object extended `MultiFit` (a.k.a. "SuperFit") routines into the `Monitor`, if the Level 2 light curves do not provide sufficient accuracy. (This is a particular worry for the `SLMonitor`, which will need to deal with highly blended objects). The `Monitor` is therefore being developed as "Level 3" code, following DM standards and module structure.
 
+## Setup and testing:
+From bash
+```
+$ source <Monitor install directory>/setup/setup.sh
+$ python <Monitor install directory>/tests/test_Monitor.py
+```
+
 ## Demo
 
 Placeholder:
