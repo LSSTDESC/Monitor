@@ -9,9 +9,8 @@ python:
 # Command to install dependencies:
 install:
 #  - pip install -r requirements.txt  # We'll need this later I think...
-#  - source setup/setup.sh # Jim will need to uncomment this
+  - source setup/setup.sh
 #
 # Command to run tests:
-# script: nosetests
-script: python tests/test_Monitor.py # Jim will need to uncomment this 
+script: nosetests
 script: echo "It's all good."
