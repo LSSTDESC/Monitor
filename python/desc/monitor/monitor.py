@@ -4,7 +4,6 @@
 
 import monitor
 import os
-import lsst.daf.persistence as dp
 import pandas as pd
 import numpy as np
 import sncosmo
@@ -59,7 +58,7 @@ class LightCurve(object):
                                             bandpass + '.dat'))
             bandpassInfo = np.genfromtxt(bandpassFile, names=['wavelen', 'transmission'])
             band = sncosmo.Bandpass(bandpassInfo['wavelen'], bandpassInfo['transmission'],
-                                    name=str('lsst' + bandpass))
+                                    name=str('lsst' + bandpass), wave_unit=u.nm)
             sncosmo.registry.register(band)
 
 
