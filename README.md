@@ -12,9 +12,7 @@ $ python <Monitor install directory>/tests/test_Monitor.py
 
 ## Demo
 
-Placeholder:
-```
-    python monitor/monitor.py
+See our demo ipython notebook [here](https://github.com/DarkEnergyScienceCollaboration/Monitor/blob/master/examples/lightcurve_example.ipynb).
 ```
 
 ## People
