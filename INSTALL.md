@@ -1,6 +1,6 @@
 # Installation Notes
 
-The Monitor uses the LSST DM Stack's Butler, and also the SNCosmo package. Here's how to get these things working.
+The Monitor uses the LSST DM Stack's Butler, and also the SNCosmo package (among other things). Here's how to get everything working.
 
 ## 1. Get Anaconda Python
 
@@ -36,8 +36,11 @@ For analyzing simulated images, we need to do:
 ```
 This needs to be done every time you start a new shell - so these lines could be worth adding to your `.bashrc` file or equivalent.
 
-## 4. Install SNCosmo
+## 4. Install python packages
 
+We use several useful python packages that don't come with the DM stack:
 ```
 pip install sncosmo
+pip install pandas
+pip install nose
 ```
