@@ -1,6 +1,8 @@
-# ==============================================================================
-# License info here?
-# ==============================================================================
+# Copyright (C) 2016, LSST Dark Energy Science Collaboration (DESC)
+# All rights reserved.
+#
+# This software may be modified and distributed under the terms
+# of the modified BSD license.  See the LICENSE file for details.
 
 from __future__ import print_function
 
