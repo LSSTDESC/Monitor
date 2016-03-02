@@ -1,15 +1,17 @@
 # Installation Notes
 
+The Monitor uses the LSST DM Stack's Butler, and also the SNCosmo package. Here's how to get these things working.
+
 ## 1. Get Anaconda Python
 
-According to the [LSST community](https://community.lsst.org/t/up-and-running-with-sims-maf-contrib/383), and 
-various peopls around the DESC, it seems best to install the DM stack using `conda` - or in fact, `miniconda`. 
+According to the [LSST community](https://community.lsst.org/t/up-and-running-with-sims-maf-contrib/383), and
+various peopls around the DESC, it seems best to install the DM stack using `conda` - or in fact, `miniconda`.
 Click [here](http://conda.pydata.org/miniconda.html) and download python 2.7, if you don't have Anaconda python already.
 ```
 bash ~/Downloads/Miniconda-latest-MacOSX-x86_64.sh
 ```
-This installs miniconda into `${HOME}/miniconda2`. You should now pre-pend your `PATH` with `${HOME}/minconda2/bin` so that 
-this is becomes your default version of python. 
+This installs miniconda into `${HOME}/miniconda2`. You should now pre-pend your `PATH` with `${HOME}/minconda2/bin` so that
+this is becomes your default version of python.
 
 ## 2. Install the LSST DM Stack
 
@@ -21,7 +23,7 @@ Now do:
 ```
 conda install lsst-distrib
 ```
-and find something else to do for half an hour. This will install the LSST packages in `${HOME}/miniconda2/pkgs/`. 
+and find something else to do for half an hour. This will install the LSST packages in `${HOME}/miniconda2/pkgs/`.
 
 ## 3. Get set up to use the LSST DM Stack
 
@@ -33,3 +35,9 @@ For analyzing simulated images, we need to do:
     setup -T v11_0 obs_lsstSim --keep
 ```
 This needs to be done every time you start a new shell - so these lines could be worth adding to your `.bashrc` file or equivalent.
+
+## 4. Install SNCosmo
+
+```
+pip install sncosmo
+```
