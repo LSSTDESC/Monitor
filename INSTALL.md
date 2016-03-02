@@ -43,4 +43,5 @@ We use several useful python packages that don't come with the DM stack:
 pip install sncosmo
 pip install pandas
 pip install nose
+pip install scipy
 ```
