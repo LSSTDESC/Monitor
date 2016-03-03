@@ -59,7 +59,10 @@ class LightCurve(object):
             bandpassInfo = np.genfromtxt(bandpassFile, names=['wavelen', 'transmission'])
             band = sncosmo.Bandpass(bandpassInfo['wavelen'], bandpassInfo['transmission'],
                                     name=str('lsst' + bandpass), wave_unit=u.nm)
-            sncosmo.registry.register(band)
+            try:
+                sncosmo.registry.register(band)
+            except Exception:
+                continue
 
 
     def build_lightcurve(self, objid):
@@ -76,7 +79,8 @@ class LightCurve(object):
 
         for bandpass in self.bandpasses:
             for visit in self.visitMap[bandpass]:
-                hdulist = fits.open(str(self.fp_table_dir + '/0/v' + str(visit) + '-fr/R22/S11.fits'))
+                hdulist = fits.open(str(self.fp_table_dir + '/0/v' + str(visit) +
+                                        '-f'+bandpass+'/R22/S11.fits'))
                 objData = hdulist[1].data[np.where(hdulist[1].data['objectId']==objid)]
                 if len(objData) > 0:
                     lightcurve['bandpass'].append(str('lsst' + bandpass))
