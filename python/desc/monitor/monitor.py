@@ -1,14 +1,16 @@
-# Copyright (C) 2016, LSST Dark Energy Science Collaboration (DESC)
-# All rights reserved.
-#
-# This software may be modified and distributed under the terms
-# of the modified BSD license.  See the LICENSE file for details.
+"""
+Copyright (C) 2016, LSST Dark Energy Science Collaboration (DESC)
+All rights reserved.
+
+This software may be modified and distributed under the terms
+of the modified BSD license.  See the LICENSE file for details.
+"""
+# ==============================================================================
 
 from __future__ import print_function
 
-# import monitor
 import os
-import pandas as pd
+# import pandas as pd
 import numpy as np
 import sncosmo
 import astropy.units as u
@@ -26,7 +28,7 @@ class Monitor(object):
         return
 
     def read(self, photfile):
-        print("No IO enabled yet.")
+        print("Cannot read data from", photfile, "yet.")
         return
 
     def run(self, algorithm=None):
@@ -38,36 +40,39 @@ class Monitor(object):
 
 class LightCurve(object):
     '''
-    Fetch ForcedSource data with Butler and package for use with accompanying visualization
-    routines.
+    Fetch ForcedSource data with Butler and package for use with accompanying
+    visualization routines.
     '''
-    def __init__(self, fp_table_dir=None, bandpasses=None, visitLists=None, mjdFile=None):
+    def __init__(self, fp_table_dir=None, bandpasses=None, visit_lists=None, mjd_file=None):
 
         self.fp_table_dir = fp_table_dir
-        self.visitMap = {}
+        self.visit_map = {}
         self.bandpasses = bandpasses
         self.lightcurve = None
-        self.visitMjd = {}
+        self.visit_mjd = {}
 
         # Associate mjd with visits (just a hack for now, need to think about this more):
-        mjdList = np.genfromtxt(mjdFile, delimiter=',')
-        for visitDate in mjdList:
-            self.visitMjd[str(int(visitDate[0]))] = visitDate[1]
+        mjd_list = np.genfromtxt(mjd_file, delimiter=',')
+        for visit_date in mjd_list:
+            self.visit_mjd[str(int(visit_date[0]))] = visit_date[1]
 
-        for bandpass, visitList in zip(self.bandpasses, visitLists):
+        for bandpass, visit_list in zip(self.bandpasses, visit_lists):
             # Associate correct visits with bandpass:
-            self.visitMap[bandpass] = visitList
+            self.visit_map[bandpass] = visit_list
             # Register required lsst bandpass in sncosmo registry:
-            bandpassFile = os.path.join(str(getPackageDir('throughputs') + '/baseline/total_' +
-                                            bandpass + '.dat'))
-            bandpassInfo = np.genfromtxt(bandpassFile, names=['wavelen', 'transmission'])
-            band = sncosmo.Bandpass(bandpassInfo['wavelen'], bandpassInfo['transmission'],
-                                    name=str('lsst' + bandpass), wave_unit=u.nm)
+            bandpass_file = os.path.join(str(getPackageDir('throughputs') +
+                                             '/baseline/total_' +
+                                             bandpass + '.dat'))
+            bandpass_info = np.genfromtxt(bandpass_file,
+                                          names=['wavelen', 'transmission'])
+            band = sncosmo.Bandpass(bandpass_info['wavelen'],
+                                    bandpass_info['transmission'],
+                                    name=str('lsst' + bandpass),
+                                    wave_unit=u.nm)
             try:
                 sncosmo.registry.register(band)
             except Exception:
                 continue
-
 
     def build_lightcurve(self, objid):
         """
@@ -84,18 +89,18 @@ class LightCurve(object):
         lightcurve['zpsys'] = []
 
         for bandpass in self.bandpasses:
-            for visit in self.visitMap[bandpass]:
+            for visit in self.visit_map[bandpass]:
                 # NB. Hard-coded filename conventions:
                 hdulist = fits.open(str(self.fp_table_dir + '/0/v' + str(visit) +
                                         '-f'+bandpass+'/R22/S11.fits'))
-                objData = hdulist[1].data[np.where(hdulist[1].data['objectId']==objid)]
-                if len(objData) > 0:
+                obj_data = hdulist[1].data[np.where(hdulist[1].data['objectId'] == objid)]
+                if len(obj_data) > 0:
                     lightcurve['bandpass'].append(str('lsst' + bandpass))
-                    lightcurve['mjd'].append(self.visitMjd[str(visit)])
-                    lightcurve['ra'].append(objData['coord_ra'][0])
-                    lightcurve['dec'].append(objData['coord_dec'][0])
-                    lightcurve['flux'].append(objData['base_PsfFlux_flux'][0])
-                    lightcurve['flux_error'].append(objData['base_PsfFlux_fluxSigma'][0])
+                    lightcurve['mjd'].append(self.visit_mjd[str(visit)])
+                    lightcurve['ra'].append(obj_data['coord_ra'][0])
+                    lightcurve['dec'].append(obj_data['coord_dec'][0])
+                    lightcurve['flux'].append(obj_data['base_PsfFlux_flux'][0])
+                    lightcurve['flux_error'].append(obj_data['base_PsfFlux_fluxSigma'][0])
                     lightcurve['zp'].append(25.0)
                     lightcurve['zpsys'].append('ab')
         self.lightcurve = lightcurve
@@ -108,17 +113,10 @@ class LightCurve(object):
         if self.lightcurve is None:
             raise ValueError('No lightcurve yet. Use build_lightcurve first.')
 
-        lcTable = Table(data=self.lightcurve)
-        fig = sncosmo.plot_lc(lcTable)
+        lc_table = Table(data=self.lightcurve)
+        fig = sncosmo.plot_lc(lc_table)
 
         return fig
 
-
-# ==============================================================================
-# Need better tests...
-
-if __name__ == '__main__':
-
-    newMonitor = Monitor()
 
 # ==============================================================================
