@@ -20,6 +20,7 @@ See our demo ipython notebook [here](https://github.com/DarkEnergyScienceCollabo
 
 * [Bryce Kalmbach](https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@jbkalmbach) (UW)
 * [Phil Marshall](https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@drphilmarshall) (SLAC)
+* [Jim Chiang](https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@jchiang87) (SLAC)
 
 ## License etc
 
