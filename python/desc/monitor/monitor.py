@@ -103,7 +103,7 @@ class LightCurve(object):
                     lightcurve['flux_error'].append(obj_data['base_PsfFlux_fluxSigma'][0])
                     lightcurve['zp'].append(25.0)
                     lightcurve['zpsys'].append('ab')
-        self.lightcurve = lightcurve
+        self.lightcurve = Table(data=lightcurve)
 
 
     def visualize_lightcurve(self):
@@ -113,10 +113,8 @@ class LightCurve(object):
         if self.lightcurve is None:
             raise ValueError('No lightcurve yet. Use build_lightcurve first.')
 
-        lc_table = Table(data=self.lightcurve)
-        fig = sncosmo.plot_lc(lc_table)
+        fig = sncosmo.plot_lc(self.lightcurve)
 
         return fig
-
 
 # ==============================================================================
