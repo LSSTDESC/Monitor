@@ -1,17 +1,16 @@
-language: python
-python:
-#  - "2.6"
-  - "2.7"
-#  - "3.2"
-#  - "3.3"
-#  - "3.4"
-#
-# Command to install dependencies:
+language: C
+
 install:
-#  - pip install -r requirements.txt  # We'll need this later I think...
-  - source setup/setup.sh
-#
-# Command to run tests:
+  - CHANNEL=http://eupsforge.net/conda/dev ./setup/install.sh lsst-sims nose pandas
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - source eups-setups.sh
+  - setup lsst_sims
+  - eups declare -r . Monitor -t current
+  - setup Monitor
+
+cache:
+  directories:
+  - $HOME/miniconda.tarball
+
 script:
   - nosetests
-  - echo "It's all good."
