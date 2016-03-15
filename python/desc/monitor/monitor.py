@@ -43,11 +43,11 @@ class LightCurve(object):
     Fetch ForcedSource data with Butler and package for use with accompanying
     visualization routines.
     '''
-    def __init__(self, fp_table_dir=None, bandpasses=None, visit_lists=None, mjd_file=None):
+    def __init__(self, fp_table_dir=None, mjd_file=None):
 
         self.fp_table_dir = fp_table_dir
         self.visit_map = {}
-        self.bandpasses = bandpasses
+        self.bandpasses = []
         self.lightcurve = None
         self.visit_mjd = {}
 
@@ -56,23 +56,28 @@ class LightCurve(object):
         for visit_date in mjd_list:
             self.visit_mjd[str(int(visit_date[0]))] = visit_date[1]
 
-        for bandpass, visit_list in zip(self.bandpasses, visit_lists):
-            # Associate correct visits with bandpass:
-            self.visit_map[bandpass] = visit_list
-            # Register required lsst bandpass in sncosmo registry:
-            bandpass_file = os.path.join(str(getPackageDir('throughputs') +
-                                             '/baseline/total_' +
-                                             bandpass + '.dat'))
-            bandpass_info = np.genfromtxt(bandpass_file,
-                                          names=['wavelen', 'transmission'])
-            band = sncosmo.Bandpass(bandpass_info['wavelen'],
-                                    bandpass_info['transmission'],
-                                    name=str('lsst' + bandpass),
-                                    wave_unit=u.nm)
-            try:
-                sncosmo.registry.register(band)
-            except Exception:
-                continue
+        for visit_dir in os.listdir(str(fp_table_dir+'/0/')):
+            visit_band = visit_dir[-1]
+            visit_num = visit_dir[1:-3]
+            if visit_band not in self.bandpasses:
+                self.bandpasses.append(visit_band)
+                self.visit_map[visit_band] = [visit_num]
+                # Register required lsst bandpass in sncosmo registry:
+                bandpass_file = os.path.join(str(getPackageDir('throughputs') +
+                                                 '/baseline/total_' +
+                                                 visit_band + '.dat'))
+                bandpass_info = np.genfromtxt(bandpass_file,
+                                              names=['wavelen', 'transmission'])
+                band = sncosmo.Bandpass(bandpass_info['wavelen'],
+                                        bandpass_info['transmission'],
+                                        name=str('lsst' + visit_band),
+                                        wave_unit=u.nm)
+                try:
+                    sncosmo.registry.register(band)
+                except Exception:
+                    continue
+            else:
+                self.visit_map[visit_band].append(visit_num)
 
     def build_lightcurve(self, objid):
         """
