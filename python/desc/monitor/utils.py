@@ -1,8 +1,9 @@
 """
 Utilities that we will often be using
 """
-from future.utils import itervalues 
+from future.builtins import dict
 __all__ = ['aliasDictionary', 'mapSeq2Standard']
+
 def aliasDictionary(sequence, aliases):
     """
     Given a dictionary of
@@ -28,8 +29,8 @@ def aliasDictionary(sequence, aliases):
     --------
     >>> aliases = dict(time=['mjd','expmjd'], flux=['counts'], fluxerr=['flux_err', 'fluxerror'])
     >>> testSeq = ['mJd', 'band', 'zp', 'Flux', 'fluxError']
-    >>> monitor.aliasDictionary(testSeq, aliases) 
-    >>> {'Flux': 'flux', 'fluxError': 'fluxerr', 'mJd': 'time'}
+    >>> aliasDictionary(testSeq, aliases) == {'Flux': 'flux', 'fluxError': 'fluxerr', 'mJd': 'time'}
+    True
 
     Notes:
     -----
@@ -42,14 +43,14 @@ def aliasDictionary(sequence, aliases):
 
     # Check that there is no string which might be the alias of more than one
     # variable
-    _valueList = list(x for l in itervalues(aliases) for x in l)
+    _valueList = list(x for l in aliases.values() for x in l)
     assert len(set(_valueList)) == len(_valueList)
 
     # insert the standard name in the list of values
     # (necesary for the case where variable names are std names with caps)
     _ = [aliases.update({key: [key] + aliases[key]}) for key in aliases.keys()]
 
-    # invert aliases dictionary to get 
+    # invert aliases dictionary to get
     inverse_dict = dict()
     _ = [inverse_dict.update({alias:aliastuple[0]})
          for aliastuple in aliases.iteritems() for alias in aliastuple[1]]
@@ -57,7 +58,8 @@ def aliasDictionary(sequence, aliases):
     # Account for capitalization issues
     testDict = dict((s.lower(), s) for s in sequence)
     aliasedSet = set(inverse_dict.keys()) & set(testDict.keys())
-    
+
+
     # return the dictionary
     aliasDict = dict((testDict[key], inverse_dict[key]) for key in aliasedSet)
 
@@ -65,6 +67,33 @@ def aliasDictionary(sequence, aliases):
 
 def mapSeq2Standard(sequence, aliasDict):
     """
+    given a sequence of strings return a list of the strings, replacing those
+    strings in the input sequence which are keys in the dictionary by their
+    dictionary values
+
+    Parameters
+    ---------
+    sequence : sequence of strings
+
+    aliasDict : Dictionary
+        Dictionary of aliases where the keys are strings in the sequence and
+        the values are the standard names associated with those strings
+
+    Returns
+    -------
+    list of strings
+
+    Examples
+    --------
+    >>> aliases = dict(time=['mjd','expmjd'], flux=['counts'], fluxerr=['flux_err', 'fluxerror']) 
+    >>> testSeq = ['mJd', 'band', 'zp', 'Flux', 'fluxError']
+    >>> aliasDict = aliasDictionary(testSeq, aliases)
+    >>> mapSeq2Standard(testSeq, aliasDict) == ['time', 'band', 'zp', 'flux', 'fluxerr']
+    True
+
+    Notes
+    -----
+
     """
-    std = [aliasDict[x] if x in aliasDict.keys() else x for x in sequence]
+    std = [aliasDict[x] if x in aliasDict else x for x in sequence]
     return std
