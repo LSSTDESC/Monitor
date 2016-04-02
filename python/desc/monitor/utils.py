@@ -27,8 +27,8 @@ def aliasDictionary(sequence, aliases):
 
     Examples
     --------
-    >>> aliases = dict(time=['mjd','expmjd'], flux=['counts'], fluxerr=['flux_err', 'fluxerror'])
-    >>> testSeq = ['mJd', 'band', 'zp', 'Flux', 'fluxError']
+    >>> aliases = dict(time=['mjd','expmjd'], flux=['counts'], fluxerr=['flux_err', 'fluxerror'], zpsys=['magsys'])
+    >>> testSeq = ['mJd', 'band', 'zp', 'Flux', 'fluxError', 'zpsys']
     >>> aliasDictionary(testSeq, aliases) == {'Flux': 'flux', 'fluxError': 'fluxerr', 'mJd': 'time'}
     True
 
@@ -61,7 +61,8 @@ def aliasDictionary(sequence, aliases):
 
 
     # return the dictionary
-    aliasDict = dict((testDict[key], inverse_dict[key]) for key in aliasedSet)
+    aliasDict = dict((testDict[key], inverse_dict[key]) for key in aliasedSet
+                     if testDict[key] != inverse_dict[key])
 
     return aliasDict
 
