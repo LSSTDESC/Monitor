@@ -14,11 +14,14 @@ import os
 import numpy as np
 import sncosmo
 import astropy.units as u
+from astropy.time import Time
 from astropy.io import fits
 from astropy.table import Table
 from lsst.utils import getPackageDir
+from dbConnection import dbInterface as dbi
 
 # ==============================================================================
+
 
 class Monitor(object):
     '''
@@ -38,45 +41,46 @@ class Monitor(object):
 
 # =============================================================================
 
+
 class LightCurve(object):
     '''
     Fetch ForcedSource data with Butler and package for use with accompanying
     visualization routines.
     '''
-    def __init__(self, fp_table_dir=None, mjd_file=None):
+    def __init__(self, fp_table_dir=None, mjd_file=None,
+                 filter_list=['u', 'g', 'r', 'i', 'z', 'y']):
 
-        self.fp_table_dir = fp_table_dir
-        self.visit_map = {}
-        self.bandpasses = []
-        self.lightcurve = None
-        self.visit_mjd = {}
+        for filter_name in filter_list:
+            bandpass_file = os.path.join(str(getPackageDir('throughputs') +
+                                             '/baseline/total_' +
+                                             filter_name + '.dat'))
+            bandpass_info = np.genfromtxt(bandpass_file,
+                                          names=['wavelen', 'transmission'])
+            band = sncosmo.Bandpass(bandpass_info['wavelen'],
+                                    bandpass_info['transmission'],
+                                    name=str('lsst' + filter_name),
+                                    wave_unit=u.nm)
+            try:
+                sncosmo.registry.register(band)
+            except Exception:
+                continue
 
-        # Associate mjd with visits (just a hack for now, need to think about this more):
-        mjd_list = np.genfromtxt(mjd_file, delimiter=',')
-        for visit_date in mjd_list:
-            self.visit_mjd[str(int(visit_date[0]))] = visit_date[1]
+        if fp_table_dir is not None:
+            self.fp_table_dir = fp_table_dir
+            self.visit_map = {}
+            self.bandpasses = []
+            self.lightcurve = None
+            self.visit_mjd = {}
 
-        for visit_dir in os.listdir(str(fp_table_dir+'/0/')):
-            visit_band = visit_dir[-1]
-            visit_num = visit_dir[1:-3]
-            if visit_band not in self.bandpasses:
-                self.bandpasses.append(visit_band)
-                self.visit_map[visit_band] = [visit_num]
-                # Register required lsst bandpass in sncosmo registry:
-                bandpass_file = os.path.join(str(getPackageDir('throughputs') +
-                                                 '/baseline/total_' +
-                                                 visit_band + '.dat'))
-                bandpass_info = np.genfromtxt(bandpass_file,
-                                              names=['wavelen', 'transmission'])
-                band = sncosmo.Bandpass(bandpass_info['wavelen'],
-                                        bandpass_info['transmission'],
-                                        name=str('lsst' + visit_band),
-                                        wave_unit=u.nm)
-                try:
-                    sncosmo.registry.register(band)
-                except Exception:
-                    continue
-            else:
+            # Associate mjd with visits (just a hack for now, need to think about
+            # this more):
+            mjd_list = np.genfromtxt(mjd_file, delimiter=',')
+            for visit_date in mjd_list:
+                self.visit_mjd[str(int(visit_date[0]))] = visit_date[1]
+
+            for visit_dir in os.listdir(str(fp_table_dir+'/0/')):
+                visit_band = visit_dir[-1]
+                visit_num = visit_dir[1:-3]
                 self.visit_map[visit_band].append(visit_num)
 
     def build_lightcurve(self, objid):
@@ -96,9 +100,11 @@ class LightCurve(object):
         for bandpass in self.bandpasses:
             for visit in self.visit_map[bandpass]:
                 # NB. Hard-coded filename conventions:
-                hdulist = fits.open(str(self.fp_table_dir + '/0/v' + str(visit) +
+                hdulist = fits.open(str(self.fp_table_dir + '/0/v' +
+                                        str(visit) +
                                         '-f'+bandpass+'/R22/S11.fits'))
-                obj_data = hdulist[1].data[np.where(hdulist[1].data['objectId'] == objid)]
+                obj_idx = np.where(hdulist[1].data['objectId'] == objid)
+                obj_data = hdulist[1].data[obj_idx]
                 if len(obj_data) > 0:
                     lightcurve['bandpass'].append(str('lsst' + bandpass))
                     lightcurve['mjd'].append(self.visit_mjd[str(visit)])
@@ -110,6 +116,39 @@ class LightCurve(object):
                     lightcurve['zpsys'].append('ab')
         self.lightcurve = Table(data=lightcurve)
 
+    def build_lightcurve_from_db(self, objid):
+        """
+        Assemble a light curve data table from available files.
+        """
+
+        dbConn_lc = dbi()
+        fs_results = dbConn_lc.forcedSourceFromId(objid)
+        obj_info = dbConn_lc.objectFromId(objid)
+
+        lightcurve = {}
+        lightcurve['bandpass'] = []
+        lightcurve['mjd'] = []
+        lightcurve['ra'] = []
+        lightcurve['dec'] = []
+        lightcurve['flux'] = []
+        lightcurve['flux_error'] = []
+        lightcurve['zp'] = []
+        lightcurve['zpsys'] = []
+
+        for visit in fs_results:
+            visit_info = dbConn_lc.visitFromCcdVisitId(visit['ccd_visit_id'])
+            lightcurve['bandpass'].append(str('lsst' +
+                                              visit_info['filter'][0]))
+            timestamp = Time(visit_info['obs_start'][0], scale='utc')
+            lightcurve['mjd'].append(timestamp.mjd)
+            lightcurve['ra'].append(obj_info['ra'][0])
+            lightcurve['dec'].append(obj_info['dec'][0])
+            lightcurve['flux'].append(visit['psf_flux'])
+            lightcurve['flux_error'].append(visit['psf_flux_err'])
+            lightcurve['zp'].append(25.0) ### TEMP
+            lightcurve['zpsys'].append('ab') ### TEMP
+
+        self.lightcurve = Table(data=lightcurve)
 
     def visualize_lightcurve(self):
         """
