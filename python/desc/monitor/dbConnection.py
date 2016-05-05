@@ -47,3 +47,19 @@ class dbInterface(object):
                    where objectId = %i""" % objectId
         results = self._dbo.execute_arbitrary(query, dtype=dtype)
         return results
+
+    def objectFromRaDec(self, ra, dec, tol):
+
+        dtype = np.dtype([('object_id', np.int),
+                          ('parent_object_id', np.int),
+                          ('ra', np.float),
+                          ('dec', np.float)])
+        query = """select objectId, parentObjectId, psRa, psDecl
+                   from Object
+                   where (psRa > %f) and (psRa < %f)
+                   and (psDecl > %f) and (psDecl < %f)""" % (ra - tol,
+                                                             ra + tol,
+                                                             dec - tol,
+                                                             dec + tol)
+        results = self._dbo.execute_arbitrary(query, dtype=dtype)
+        return results
