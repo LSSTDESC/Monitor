@@ -6,7 +6,6 @@ class dbInterface(object):
     def __init__(self):
 
         self._dbo = DBObject(database='DESC_Twinkles_Level_2',
-                             #host='scidb1.nersc.gov',
                              host = '127.0.0.1',
                              port='3307',
                              driver='mysql')

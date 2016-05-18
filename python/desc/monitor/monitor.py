@@ -67,8 +67,8 @@ class LightCurve(object):
 
         if fp_table_dir is not None:
             self.fp_table_dir = fp_table_dir
-            self.visit_map = {}
-            self.bandpasses = []
+            self.bandpasses = filter_list
+            self.visit_map = {x:[] for x in self.bandpasses}
             self.lightcurve = None
             self.visit_mjd = {}
 
@@ -116,14 +116,29 @@ class LightCurve(object):
                     lightcurve['zpsys'].append('ab')
         self.lightcurve = Table(data=lightcurve)
 
-    def build_lightcurve_from_db(self, objid):
+    def build_lightcurve_from_db(self, objid=None, ra_dec=None, tol=0.005):
         """
         Assemble a light curve data table from available files.
         """
 
+        if (objid is None) and (ra_dec is None):
+            raise ValueError('Must specify either objid or ra,dec location.')
+        elif (objid is not None) and (ra_dec is not None):
+            raise ValueError(str('Please specify only one of objid or ' +
+                                 'ra,dec location.'))
+
         dbConn_lc = dbi()
-        fs_results = dbConn_lc.forcedSourceFromId(objid)
-        obj_info = dbConn_lc.objectFromId(objid)
+
+        if objid is not None:
+            obj_info = dbConn_lc.objectFromId(objid)
+            fs_results = dbConn_lc.forcedSourceFromId(objid)
+
+        if ra_dec is not None:
+            obj_info = dbConn_lc.objectFromRaDec(ra_dec[0], ra_dec[1], tol)
+            if len(obj_info) == 0:
+                raise ValueError('No objects within specified ra,dec range.')
+            elif len(obj_info) > 1:
+                print(obj_info)
 
         lightcurve = {}
         lightcurve['bandpass'] = []
