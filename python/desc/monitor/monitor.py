@@ -116,7 +116,10 @@ class LightCurve(object):
                     lightcurve['zpsys'].append('ab')
         self.lightcurve = Table(data=lightcurve)
 
-    def build_lightcurve_from_db(self, objid=None, ra_dec=None, tol=0.005):
+    def build_lightcurve_from_db(self, objid=None, ra_dec=None, tol=0.005,
+                                 database='DESC_Twinkles_Level_2',
+                                 host='127.0.0.1', port='3307',
+                                 driver='mysql'):
         """
         Assemble a light curve data table from available files.
         """
@@ -127,7 +130,7 @@ class LightCurve(object):
             raise ValueError(str('Please specify only one of objid or ' +
                                  'ra,dec location.'))
 
-        dbConn_lc = dbi()
+        dbConn_lc = dbi(database=database, host=host, port=port, driver=driver)
 
         if objid is not None:
             obj_info = dbConn_lc.objectFromId(objid)

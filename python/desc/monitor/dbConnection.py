@@ -3,12 +3,10 @@ from lsst.sims.catalogs.generation.db import DBObject
 
 class dbInterface(object):
 
-    def __init__(self):
+    def __init__(self, database, host, port, driver):
 
-        self._dbo = DBObject(database='DESC_Twinkles_Level_2',
-                             host = '127.0.0.1',
-                             port='3307',
-                             driver='mysql')
+        self._dbo = DBObject(database=database, host=host, port=port,
+                             driver=driver)
 
     def forcedSourceFromId(self, objectId):
 
