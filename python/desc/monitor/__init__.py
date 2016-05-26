@@ -1,1 +1,2 @@
-from monitor import *
+from __future__ import absolute_import
+from . monitor import *
