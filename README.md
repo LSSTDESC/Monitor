@@ -11,7 +11,7 @@ $ nosetests
 ```
 or use the c-shell alternative. The `Monitor` uses some DM stack code, notably the `Butler`; see the [installation notes](https://github.com/DarkEnergyScienceCollaboration/Monitor/blob/master/INSTALL.md) for help getting set up.
 
-Setting up ssh tunnel for database access:
+#####Setting up ssh tunnel for database access:
 
 In order to produce light curves with output from the [Twinkles](https://github.com/DarkEnergyScienceCollaboration/Twinkles/tree/master/python/desc/twinkles) project one needs to be able to access the SQL database where DM processed output is stored. To do that one needs to setup an ssh tunnel for access. We use the same tools as the connection to the UW LSST CATSIM Database with instructions [here](https://confluence.lsstcorp.org/display/SIM/Accessing+the+UW+CATSIM+Database). Follow the step at the beginning to install the necessary tools and then replace step 1 code with the following command line entry with your NERSC username in the proper place:
 
