@@ -5,7 +5,7 @@ from __future__ import absolute_import, division
 import os
 import unittest
 import lsst.afw.image as afwImage
-from desc.twinkles import PostageStampMaker, create_postage_stamps
+from desc.monitor import PostageStampMaker, create_postage_stamps
 
 
 class PostageStampTestCase(unittest.TestCase):
@@ -16,7 +16,7 @@ class PostageStampTestCase(unittest.TestCase):
         test FITS file, coordinates of the image center, and a postage
         stamp size of 10 arcsec.
         """
-        self.expfile = os.path.join(os.environ['TWINKLES_DIR'],
+        self.expfile = os.path.join(os.environ['MONITOR_DIR'],
                                     'tests', 'small_CoaddTempExp.fits.gz')
         self.stamp_maker = PostageStampMaker(self.expfile)
         center_coord = self.stamp_maker.center_coord(self.stamp_maker.exposure)
