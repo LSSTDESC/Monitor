@@ -76,7 +76,7 @@ class RefLightCurves(object):
                                index_col=self.idCol, coerce_float=False)
         return df
 
-    def astro_object(self, idValue, obsMetaDataList):
+    def astro_object(self, idValue, offset=59580.):
         """
         """
         df = self.get_params(idValue)
@@ -84,11 +84,13 @@ class RefLightCurves(object):
         paramDict = dict()
         for param in ['t0', 'x0', 'x1', 'c']:
             paramDict[param] = df[param].values
+        paramDict['t0'] += offset
         paramDict['z'] = df.redshift.values[0]
         sn.set(**paramDict)
         return sn
 
-    def lightCurve(self, observations, format='dataframe',
+    def lightCurve(self, idValue, observations, bandpassDict,
+                   format='dataframe',
                    keys=['expMJD', 'filter', 'fiveSigmaDepth'],
                    photParams=None):
         """
@@ -96,6 +98,8 @@ class RefLightCurves(object):
 
         Parameters
         ----------
+        idValue: integer, mandatory
+            index of astrophysical object
         observations: mandatory, allowed formats decided by format variable
             observations corresponding to which the light curve is obtained
         format: string, optional, defaults to dataframe
@@ -119,7 +123,39 @@ class RefLightCurves(object):
             raise NotImplementedError(
                 "Unavailable input format {0}".format(format))
 
-        return
+        sn = self.astro_object(idValue)
+        timeMin = sn.mintime()
+        timeMax = sn.maxtime()
+
+        df = observations.query('expMJD < @timeMax and expMJD > @timeMin').copy()
+
+        times = []
+        bands = []
+        fluxs = []
+        fluxerrs = []
+        m5vals = []
+        for ind in df.index.values:
+            time = df.ix[ind, 'expMJD']
+            band = df.ix[ind, 'filter']
+            flux = sn.catsimBandFlux(time=time, bandpassobject=bandpassDict[band])
+            m5val = df.ix[ind, 'fiveSigmaDepth']
+            fluxerr = sn.catsimBandFluxError(time=time, bandpassobject=bandpassDict[band],
+                                        m5=m5val, fluxinMaggies=flux)
+            times.append(time)
+            bands.append(band)
+            m5vals.append(m5val)
+            fluxs.append(flux)
+            fluxerrs.append(fluxerr)
+
+        mydict = dict()
+        mydict['time'] = times
+        mydict['flux'] = fluxs
+        mydict['fluxerr'] = fluxerrs
+        mydict['band'] = bands
+        mydict['m5'] = m5vals
+        output = pd.DataFrame(mydict, index=df.index)
+
+        return output
 
 
 if __name__ == '__main__':
@@ -143,6 +179,4 @@ if __name__ == '__main__':
     print(reflc.idSequence)
     print('query_stmt', reflc.query())
     print('dataframe', reflc.get_params())
-    sn = reflc.astro_object(idValue=6001163623700, obsMetaDataList=None)
-    print(sn)
-    print(sn.SNstate)
+    sn = reflc.astro_object(idValue=6001163623700)
