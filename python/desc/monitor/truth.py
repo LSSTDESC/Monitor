@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function
 """
 Module to obtain truth values and truth light curves from the catsim database
 """
+import numpy as np
 import pandas as pd
 import lsst.sims.catUtils.baseCatalogModels as bcm
 from lsst.sims.catUtils.supernovae import SNObject
@@ -75,7 +76,7 @@ class RefLightCurves(object):
 
     @staticmethod
     def uniqueIDtoTableId(uniqueID, objTypeID, nshift=10):
-        id = uniqueID - objID
+        id = uniqueID - objTypeID
         return np.right_shift(id, nshift) 
 
     @property
@@ -173,7 +174,8 @@ class RefLightCurves(object):
 
         # if query is for a single idvalue, construct the query stmt
         if idValue is not None:
-            tableIdValue = self.uniqueIDtoTableId(idValue, objID=42, nshift=10)
+            tableIdValue = self.uniqueIDtoTableId(idValue, objTypeID=42,
+                                                  nshift=10)
             query += "WHERE {0} = {1}".format(self.idCol, tableIdValue)
         # if idValue is not supplied, but an idSequence is supplied
         elif self.idSequence is not None:
