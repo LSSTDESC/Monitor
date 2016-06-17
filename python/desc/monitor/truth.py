@@ -81,6 +81,8 @@ class RefLightCurves(object):
 
     @property
     def idSequence(self):
+        if self._idSequence is None:
+            return None
         x = np.asarray(self._idSequence)
         return self.uniqueIDtoTableId(x, objTypeID=42, nshift=10)
 
@@ -179,7 +181,7 @@ class RefLightCurves(object):
             query += "WHERE {0} = {1}".format(self.idCol, tableIdValue)
         # if idValue is not supplied, but an idSequence is supplied
         elif self.idSequence is not None:
-            query += "WHERE {0} in {1}".format(self.idCol, self.idSequence)
+            query += "WHERE {0} in {1}".format(self.idCol, tuple(self.idSequence))
         # Else get the entire table, no WHERE clause
         else:
             pass
