@@ -38,7 +38,8 @@ class RefLightCurves(object):
         cursor to the DataBase Connection. If None, a new cursor is obtained
         from self.dbConnection
     idSequence: sequence of one dimension, optional, defaults to None
-        sequence of values indexing the astrophysical objects in the database.
+        sequence of unique ids in the catsim universe indexing the
+        astrophysical objects in the database.
 
     Examples
     --------
@@ -59,17 +60,29 @@ class RefLightCurves(object):
         self.columns = columns
         self.dbConnection = dbConnection
         self._dbCursor = dbCursor
-        self.idSequence = idSequence
+        self._idSequence = idSequence
         self.columns = columns
         self.idCol = idCol
         self.tableName = tableName
         self._idvals = None
+        self.objectID = 42
 
     @property
     def dbCursor(self):
         if self._dbCursor is None:
             self._dbCursor = self.dbConnection.cursor()
         return self._dbCursor
+
+    @staticmethod
+    def uniqueIDtoTableId(uniqueID, objTypeID, nshift=10):
+        id = uniqueID - objID
+        return np.right_shift(id, nshift) 
+
+    @property
+    def idSequence(self):
+        x = np.asarray(self._idSequence)
+        return self.uniqueIDtoTableId(x, objTypeID=42, nshift=10)
+
 
     def allIdinTable(self, sqlconstraint='', chunksize=None):
         """
@@ -140,7 +153,7 @@ class RefLightCurves(object):
         Parameters
         ----------
         idValue: integer, optional, defaults to None
-            ID of the astrophysical object. If None, then the query
+            unique ID of the astrophysical object. If None, then the query
             is built for all objects in idSequence. If None, then
             the query is built for all objects in the table
         columns: tuple of strings, optional, defaults to None
@@ -160,7 +173,8 @@ class RefLightCurves(object):
 
         # if query is for a single idvalue, construct the query stmt
         if idValue is not None:
-            query += "WHERE {0} = {1}".format(self.idCol, idValue)
+            tableIdValue = self.uniqueIDtoTableId(idValue, objID=42, nshift=10)
+            query += "WHERE {0} = {1}".format(self.idCol, tableIdValue)
         # if idValue is not supplied, but an idSequence is supplied
         elif self.idSequence is not None:
             query += "WHERE {0} in {1}".format(self.idCol, self.idSequence)
