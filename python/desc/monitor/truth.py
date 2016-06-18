@@ -1,12 +1,9 @@
 """
-A class to download the truth parameters of objects and build light curves
-from them.
+A module to download the truth parameters of astrophysical objects on fatboy and
+build light curves from them.
 """
 
 from __future__ import absolute_import, division, print_function
-"""
-Module to obtain truth values and truth light curves from the catsim database
-"""
 import numpy as np
 import pandas as pd
 import lsst.sims.catUtils.baseCatalogModels as bcm
@@ -15,32 +12,67 @@ import pymssql
 import os
 from lsst.utils import getPackageDir
 from lsst.daf.persistence import DbAuth
+from lsst.sims.photUtils import BandpassDict
 
+
+__all__ = ['RefLightCurves']
 
 class RefLightCurves(object):
     """
-    Class to connect to the database tables on fatboy and obtain reference
+    Class to connect to the database tables on fatboy and obtain truth
     light curves
 
     Parameters
     ----------
-    tableName: string, mandatory
+    tableName : string, mandatory
         case insensitive string name of table on database to connect to
         for model parameters of astrophysical objects
-    idCol: string, optional, defaults to 'snid'
+    idCol : string, optional, defaults to 'snid'
         column name of Index on the table
-    columns: tuple of strings, optional, defaults to values for SN
+    observations : `pd.DataFrame`, optional, defaults to None
+        if None, some information may need to be supplied in using certain
+        methods like lightCurve. The dataframe must have the following columns
+        'index' : obsHistID, 'expMJD': MJD of the time of exposure,
+        'fiveSigmaDepth': magnitude of a point source for which the signal to
+        noise ratio in that exposure would be expected to be 5.0. Such
+        information would be accessible from a OpSim output.
+    bandPassDict : instance of `lsst.sims.bandPassDict`, optional,
+        defaults to None
+    columns : tuple of strings, optional, defaults to values for SN
         tuple of strings that completely specify the truth values for
         the astrophysical object
-    dbConnection: `pymssql.connection` instance, mandatory
+    dbConnection : `pymssql.connection` instance, mandatory
         connection to the database where the relevant tables of catsim
         objects are stored
-    dbCursor: `pymssql.connection.cursor` instnce, optional, defaults to None
+    dbCursor : `pymssql.connection.cursor` instnce, optional, defaults to None
         cursor to the DataBase Connection. If None, a new cursor is obtained
         from self.dbConnection
-    idSequence: sequence of one dimension, optional, defaults to None
+    idSequence : sequence of one dimension, optional, defaults to None
         sequence of unique ids in the catsim universe indexing the
         astrophysical objects in the database.
+    dbHostName : string, optional, defaults to None
+        force the class to use this hostname. If not provided, the class will
+        set this to localhost, which is the desired hostname when using an ssh
+        tunnel. This parameter is useful when working from whitelisted
+        computers
+
+    Attributes
+    ----------
+    columns :  The columns that will be obtained from the table on the catsim
+        database
+    idCol : The column name on the table of the astrophysical object which
+        indexes the objects
+    tableName : Name of the table on the catsim database containing the
+        parameters of the astrophysical object
+    objectTypeID : a unique integer associated with each class of astrophysical
+        objects in catsim.
+    dbHostName : a name for hostname of the database
+    bandPassDict : bandpasses for the observations
+    observations : a set of observations incorporating information about time
+        of observaations and the fiveSigma Depths of the observations.
+
+    Methods
+    -------
 
     Examples
     --------
@@ -51,9 +83,12 @@ class RefLightCurves(object):
     """
     def __init__(self,
                  tableName,
+                 objectTypeID=42,
                  idCol='snid',
                  columns=('snid', 'redshift', 'snra', 'sndec', 't0', 'x0',
                           'x1', 'c'),
+                 observations=None,
+                 bandPassDict=None,
                  dbConnection=None,
                  dbCursor=None,
                  dbHostName=None,
@@ -67,12 +102,75 @@ class RefLightCurves(object):
         self.idCol = idCol
         self.tableName = tableName
         self._idvals = None
-        self.objectID = 42
-        if dbHostName is not None:
-            self.dbHostName = dbHostName
+        self.objectID = objectTypeID
+        self.dbHostName = dbHostName
+        self.bandPassDict = bandPassDict
+        self.observations = observations
+
+    @classmethod
+    def fromTwinklesData(cls,
+                         tableName,
+                         objectTypeID=42,
+                         dbHostName=None,
+                         idCol='snid',
+                         columns=('snid', 'redshift', 'snra', 'sndec', 't0',
+                                  'x0', 'x1', 'c'),
+                         idSequence=None):
+        """
+        Simplified classmethod to construct this class from the Twinkles Run 1
+        perspective.
+
+        Parameters
+        ----------
+        tableName : string, mandatory
+            case insensitive string name of table on database to connect to
+            for model parameters of astrophysical objects
+        idCol : string, optional, defaults to 'snid'
+            column name of Index on the table
+        columns : tuple of strings, optional, defaults to values for SN
+            tuple of strings that completely specify the truth values for
+        idSequence : sequence of one dimension, optional, defaults to None
+            sequence of unique ids in the catsim universe indexing the
+            astrophysical objects in the database.
+        dbHostName : string, optional, defaults to None
+            force the class to use this hostname. If not provided, the class
+            will set this to localhost, which is the desired hostname when
+            using an ssh tunnel. This parameter is useful when working from
+            whitelisted computers.
+
+        Returns
+        ------
+        An instance of the class RefLightCurve class where the other parameters
+        have been defaulted to sensible values for Twinkles Run1 Analysis.
+
+        Examples
+        --------
+        """
+
+        data_dir = os.path.join(os.environ['MONITOR_DIR'], 'data')
+        opsimCsv = os.path.join(data_dir, 'SelectedKrakenVisits.csv')
+        opsimdf = pd.read_csv(opsimCsv, index_col='obsHistID')
+        observations = opsimdf[['expMJD', 'filter', 'fiveSigmaDepth']].copy()
+        del opsimdf
+
+        # Obtain the tuple of total, HardWare bandPassDict and keep the total
+        lsstBP = BandpassDict.loadBandpassesFromFiles()[0]
+        cls = RefLightCurves(tableName=tableName,
+                             objectTypeID=objectTypeID,
+                             idCol=idCol,
+                             dbHostName=dbHostName,
+                             columns=columns,
+                             observations=observations,
+                             bandPassDict=lsstBP,
+                             idSequence=idSequence)
+        return cls
 
     @property
     def dbConnection(self):
+        """
+        The pymssql connection to the catsim database used to query refrence
+        objects
+        """
         if self._dbConnection is None:
             config = bcm.BaseCatalogConfig()
             config.load(os.path.join(getPackageDir("sims_catUtils"), "config",
@@ -111,18 +209,18 @@ class RefLightCurves(object):
 
         Parameters
         ----------
-        uniqueID: 1D sequence of unique IDs as found in catsim/phosim Instance
+        uniqueID : 1D sequence of unique IDs as found in catsim/phosim Instance
             catalogs.
-        objTypeID: A unique ID assigned to each class of object in the catsim
+        objTypeID : A unique ID assigned to each class of object in the catsim
             database.
-        nshift: integer, optional, defaults to 10
+        nshift : integer, optional, defaults to 10
             Number of bit shifts, exactly the same as in catsim.
 
         Returns
         -------
         `numpy.ndarray` of IDs indexing the table of the particular object.
 
-        .. note: This is an inverse of the catsim function
+        .. note:: This is an inverse of the catsim function
             `lsst.sims.catalogs_measures.Instance.get_uniqueId`. Later on I
             hope this code will be moved to a similar location.
         """
@@ -132,18 +230,13 @@ class RefLightCurves(object):
     @property
     def idSequence(self):
         """
-        An array of IDs indexing the astrophysical objects on the catsim
-        database
-
-        Returns
-        -------
-        `numpy.ndarray` of IDs on a table for an astrophysical object
+        An `numpy.ndarray` of IDs indexing the astrophysical objects on the
+        catsim database
         """
         if self._idSequence is None:
             return None
         x = np.asarray(self._idSequence)
-        return self.uniqueIDtoTableId(x, objTypeID=self.objTypeID, nshift=10)
-
+        return self.uniqueIDtoTableId(x, objTypeID=self.objectID, nshift=10)
 
     def allIdinTable(self, sqlconstraint='', chunksize=None):
         """
@@ -154,9 +247,9 @@ class RefLightCurves(object):
 
         Parameters
         ----------
-        sqlconstraint: string, optional, defaults to ''
+        sqlconstraint : string, optional, defaults to ''
             sql constraint specified through a WHERE clause
-        chunksize: integer, optional, defaults to None
+        chunksize : integer, optional, defaults to None
             if not None, the return value is a generator to
             a series getting chunkSize values at a time
 
@@ -197,7 +290,7 @@ class RefLightCurves(object):
 
         Examples
         --------
-        >>> reflc.get_numObjects() #doctest: +SKIP 
+        >>> reflc.get_numObjects() #doctest: +SKIP
         >>> 776620
         """
         query = """SELECT COUNT(*) FROM {} """.format(self.tableName)
@@ -213,17 +306,21 @@ class RefLightCurves(object):
 
         Parameters
         ----------
-        idValue: integer, optional, defaults to None
+        idValue : integer, optional, defaults to None
             unique ID of the astrophysical object. If None, then the query
             is built for all objects in idSequence. If None, then
             the query is built for all objects in the table
-        columns: tuple of strings, optional, defaults to None
+        columns : tuple of strings, optional, defaults to None
             Columns that will be queried, if None, defaults to
             self.columns
 
         Returns
         -------
         String with a query statement to use to obtain parameters
+
+        Examples
+        --------
+        >>> q = reflc.buildquery(idValue=6144030054709290)
         """
         if columns is None:
             columns = self.columns
@@ -239,7 +336,8 @@ class RefLightCurves(object):
             query += "WHERE {0} = {1}".format(self.idCol, tableIdValue)
         # if idValue is not supplied, but an idSequence is supplied
         elif self.idSequence is not None:
-            query += "WHERE {0} in {1}".format(self.idCol, tuple(self.idSequence))
+            query += "WHERE {0} in {1}".format(self.idCol,
+                                               tuple(self.idSequence))
         # Else get the entire table, no WHERE clause
         else:
             pass
@@ -252,11 +350,15 @@ class RefLightCurves(object):
 
         Parameters
         ----------
-        idValue: int, optional, defaults to None
+        idValue : int, optional, defaults to None
             indexes of the astrophysical objects whose parameters are to be
             obtained. If idValue is None, then all astrophysical objects with
             ids in `self.idSequence` are used. If `self.idSequence` is None,
             then all astrophysical objects are used.
+        Returns
+        -------
+        A DataFrame with a single row if idValue is supplied, or a DataFrame 
+        with all objects in the table with properties in self.columns
         """
         df = pd.read_sql_query(self.buildquery(idValue=idValue),
                                self.dbConnection,
@@ -270,9 +372,9 @@ class RefLightCurves(object):
 
         Parameters
         ----------
-        idValue: int, mandatory
+        idValue : int, mandatory
             index of the astro_object
-        mjdOffset: float, optional, defaults to 59580.
+        mjdOffset : float, optional, defaults to 59580.
             offset in time parameters in the database for the transient objects
 
         Returns
@@ -294,7 +396,10 @@ class RefLightCurves(object):
         sn.set(**paramDict)
         return sn
 
-    def lightCurve(self, idValue, observations, bandpassDict,
+    def lightCurve(self, idValue,
+                   bandName=None,
+                   observations=None,
+                   bandPassDict=None,
                    format='dataframe',
                    keys=['expMJD', 'filter', 'fiveSigmaDepth'],
                    photParams=None):
@@ -303,10 +408,23 @@ class RefLightCurves(object):
         `pandas.Dataframe`.
         Parameters
         ----------
-        idValue: integer, mandatory
+        idValue : integer, mandatory
             index of astrophysical object
-        observations: mandatory, allowed formats decided by format variable
-            observations corresponding to which the light curve is obtained
+        bandName : string, optional, defaults to None
+            key for bandpassDict, so that bandpassDict[key] is an instance
+            of `lsst.sims.photUtils.Bandpass`. If provided, only the light
+            curve in band band is returned
+        observations : optional, allowed formats decided by format variable,
+            defaults to None
+            maximal set observations corresponding to which the light curve is
+            obtained. If None, observations default to self.observaions. If
+            both observations and self.observations are None, an exception
+            will be raised.
+        bandPassDict : instance of `lsst.sims.photUtils.BandPassDict`, optional
+            defaults to None
+            dictionary of total (system + atmospheric) bandpasses as a
+            dictionary of bands. If None, defaults to self.bandPassDict. If
+            self.bandPassDict is None, an exception is raised
         format: string, optional, defaults to dataframe
             format in which observations are available
         keys: aliases for columns time (in MJD), bandpass Name, fivesigmaDepth
@@ -319,8 +437,9 @@ class RefLightCurves(object):
 
         Returns
         -------
-        astropy.Table containing the following columns at the minimum
-        ['time', 'flux', 'fluxerr', 'band']. If a set of indexes are provided
+        `pd.DataFrame` containing the following columns at the minimum
+        ['time', 'flux', 'fluxerr', 'band']. time is in modified Julian Days,
+        flux and fluxerrr are in `maggies`. If a set of indexes are provided
         for the m5Values (eg. as indexes in a dataFrame)
         """
         format = format.lower()
@@ -333,6 +452,18 @@ class RefLightCurves(object):
         timeMin = sn.mintime()
         timeMax = sn.maxtime()
 
+        if bandPassDict is None:
+            bandPassDict = self.bandPassDict
+        if bandPassDict is None:
+            raise ValueError('The method parameter bandPassDict, and '
+                             'the attribute bandPassDict cannot simultaneously'
+                             ' be None\n')
+        if observations is None:
+            observations = self.observations
+        if observations is None:
+            raise ValueError('The method parameter observations, and '
+                             'the attribute observations cannot simultaneously'
+                             ' be None\n')
         df = observations.query('expMJD < @timeMax and '
                                 'expMJD > @timeMin').copy()
         times = []
@@ -344,10 +475,10 @@ class RefLightCurves(object):
             time = df.ix[ind, 'expMJD']
             band = df.ix[ind, 'filter']
             flux = sn.catsimBandFlux(time=time,
-                                     bandpassobject=bandpassDict[band])
+                                     bandpassobject=bandPassDict[band])
             m5val = df.ix[ind, 'fiveSigmaDepth']
             fluxerr = sn.catsimBandFluxError(time=time,
-                                             bandpassobject=bandpassDict[band],
+                                             bandpassobject=bandPassDict[band],
                                              m5=m5val, fluxinMaggies=flux)
             times.append(time)
             bands.append(band)
@@ -362,4 +493,6 @@ class RefLightCurves(object):
         mydict['band'] = bands
         mydict['m5'] = m5vals
         output = pd.DataFrame(mydict, index=df.index)
+        if bandName is not None:
+            output = output.query('band == @bandName')
         return output
