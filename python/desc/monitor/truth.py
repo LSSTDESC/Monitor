@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 import lsst.sims.catUtils.baseCatalogModels as bcm
 from lsst.sims.catUtils.supernovae import SNObject
-# import pymssql
-# import os
-# from lsst.utils import getPackageDir
-# from lsst.daf.persistence import DbAuth
+import pymssql
+import os
+from lsst.utils import getPackageDir
+from lsst.daf.persistence import DbAuth
 
 
 class RefLightCurves(object):
@@ -56,10 +56,11 @@ class RefLightCurves(object):
                           'x1', 'c'),
                  dbConnection=None,
                  dbCursor=None,
+                 dbHostName=None,
                  idSequence=None):
 
         self.columns = columns
-        self.dbConnection = dbConnection
+        self._dbConnection = dbConnection
         self._dbCursor = dbCursor
         self._idSequence = idSequence
         self.columns = columns
@@ -67,24 +68,81 @@ class RefLightCurves(object):
         self.tableName = tableName
         self._idvals = None
         self.objectID = 42
+        if dbHostName is not None:
+            self.dbHostName = dbHostName
+
+    @property
+    def dbConnection(self):
+        if self._dbConnection is None:
+            config = bcm.BaseCatalogConfig()
+            config.load(os.path.join(getPackageDir("sims_catUtils"), "config",
+                                     "db.py"))
+
+            username = DbAuth.username(config.host, config.port)
+            password = DbAuth.password(config.host, config.port)
+            hostname = config.host
+            if self.dbHostName is not None:
+                hostname = self.dbHostName
+            DBConnection = pymssql.connect(user=username,
+                                           password=password,
+                                           host=hostname,
+                                           database=config.database,
+                                           port=config.port)
+            return DBConnection
+        else:
+            return self._dbConnection
 
     @property
     def dbCursor(self):
+        """
+        Cursor to the catsim database connection. This is not reset if one
+        exists.
+        """
         if self._dbCursor is None:
             self._dbCursor = self.dbConnection.cursor()
         return self._dbCursor
 
     @staticmethod
     def uniqueIDtoTableId(uniqueID, objTypeID, nshift=10):
-        id = uniqueID - objTypeID
-        return np.right_shift(id, nshift) 
+        """
+        Given a sequence of catsim uniqueIDs, convert it to a numpy
+        array of IDs in the table of the object (called refIDCol) using
+        objTypeID.
+
+        Parameters
+        ----------
+        uniqueID: 1D sequence of unique IDs as found in catsim/phosim Instance
+            catalogs.
+        objTypeID: A unique ID assigned to each class of object in the catsim
+            database.
+        nshift: integer, optional, defaults to 10
+            Number of bit shifts, exactly the same as in catsim.
+
+        Returns
+        -------
+        `numpy.ndarray` of IDs indexing the table of the particular object.
+
+        .. note: This is an inverse of the catsim function
+            `lsst.sims.catalogs_measures.Instance.get_uniqueId`. Later on I
+            hope this code will be moved to a similar location.
+        """
+        id = np.asarray(uniqueID) - objTypeID
+        return np.right_shift(id, nshift)
 
     @property
     def idSequence(self):
+        """
+        An array of IDs indexing the astrophysical objects on the catsim
+        database
+
+        Returns
+        -------
+        `numpy.ndarray` of IDs on a table for an astrophysical object
+        """
         if self._idSequence is None:
             return None
         x = np.asarray(self._idSequence)
-        return self.uniqueIDtoTableId(x, objTypeID=42, nshift=10)
+        return self.uniqueIDtoTableId(x, objTypeID=self.objTypeID, nshift=10)
 
 
     def allIdinTable(self, sqlconstraint='', chunksize=None):
