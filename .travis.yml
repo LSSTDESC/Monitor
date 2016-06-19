@@ -6,6 +6,8 @@ install:
   - ln -sf /home/travis/miniconda/lib/libcrypto.so.1.0.0 /home/travis/miniconda/lib/libcrypto.so.10
   - export PATH="$HOME/miniconda/bin:$PATH"
   - source eups-setups.sh
+  - pip install pytest
+  - pip install pytest-cov
   - pip install coveralls
   - setup lsst_sims
   - eups declare -r . Monitor -t current
@@ -17,7 +19,7 @@ cache:
   timeout: 600
 
 script:
-  - nosetests -s --with-coverage --cover-package=desc.monitor
+  - py.test --cov-report= --cov=desc.monitor tests/
   - pylint --py3k `find . -name \*.py -print`
 
 after_success:
