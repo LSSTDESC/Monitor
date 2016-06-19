@@ -5,7 +5,8 @@ from __future__ import absolute_import, division
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 
-__all__ = ['PostageStampMaker']
+__all__ = ['PostageStampMaker', 'create_postage_stamps']
+
 class PostageStampMaker(object):
     "Class to create postage stamps for Exposure FITS files."
     def __init__(self, expfile):
