@@ -21,7 +21,7 @@ from astropy.table import Table
 from lsst.utils import getPackageDir
 from .dbConnection import dbInterface as dbi
 
-__all__ = ['Monitor']
+__all__ = ['Monitor', 'LightCurve']
 # ==============================================================================
 
 class Monitor(object):
