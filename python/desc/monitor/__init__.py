@@ -1,5 +1,5 @@
 from __future__ import absolute_import
 from .monitor import *
 from .truth import *
-from .PostageStampMaker import PostageStampMaker, create_postage_stamps
-from .Display import render_fits_image
+from .PostageStampMaker import *
+from .Display import *
