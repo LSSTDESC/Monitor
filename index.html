@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-dark.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>Monitor by DarkEnergyScienceCollaboration</title>
+  </head>
+
+  <body>
+    <div id="container">
+      <div class="inner">
+
+        <header>
+          <h1>Monitor</h1>
+          <h2>Extract light curves for time-variable cosmological objects</h2>
+        </header>
+
+        <section id="downloads" class="clearfix">
+          <a href="https://github.com/DarkEnergyScienceCollaboration/Monitor/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
+          <a href="https://github.com/DarkEnergyScienceCollaboration/Monitor/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
+          <a href="https://github.com/DarkEnergyScienceCollaboration/Monitor" id="view-on-github" class="button"><span>View on GitHub</span></a>
+        </section>
+
+        <hr>
+
+        <section id="main_content">
+          <h1>
+<a id="the-desc-monitor" class="anchor" href="#the-desc-monitor" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>The DESC Monitor</h1>
+
+<p><img src="https://travis-ci.org/DarkEnergyScienceCollaboration/Monitor.svg" alt="Travis CI build status"></p>
+
+<p>Extracts the light curves of ("monitors") all time-variable objects of cosmological interest. The basic concept is a general purpose light curve extraction tool, that can be sub-classed to specialize in supernova monitoring or lensed quasar monitoring. In an ideal world, this code would merely take care of the book-keeping involved in assembling light curves in the appropriate format for modeling codes like <code>SNCosmo</code> and <code>SLTimer</code> by simply querying the various DM Level 2 databases. However, we are aware of the possibility that we may need to implement multi-object extended <code>MultiFit</code> (a.k.a. "SuperFit") routines into the <code>Monitor</code>, if the Level 2 light curves do not provide sufficient accuracy. (This is a particular worry for the <code>SLMonitor</code>, which will need to deal with highly blended objects). The <code>Monitor</code> is therefore being developed as "Level 3" code, following DM standards and module structure.</p>
+
+<h2>
+<a id="setup-and-testing" class="anchor" href="#setup-and-testing" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Setup and testing:</h2>
+
+<p>From bash:</p>
+
+<pre><code>$ source setup/setup.sh
+$ nosetests
+</code></pre>
+
+<p>or use the c-shell alternative. The <code>Monitor</code> uses some DM stack code, notably the <code>Butler</code>; see the <a href="https://github.com/DarkEnergyScienceCollaboration/Monitor/blob/master/INSTALL.md">installation notes</a> for help getting set up.</p>
+
+<h5>
+<a id="setting-up-ssh-tunnel-for-database-access" class="anchor" href="#setting-up-ssh-tunnel-for-database-access" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Setting up ssh tunnel for database access:</h5>
+
+<p>In order to produce light curves with output from the <a href="https://github.com/DarkEnergyScienceCollaboration/Twinkles/tree/master/python/desc/twinkles">Twinkles</a> project one needs to be able to access the SQL database where DM processed output is stored. To do that one needs to setup an ssh tunnel for access. We use the same tools as the connection to the UW LSST CATSIM Database with instructions <a href="https://confluence.lsstcorp.org/display/SIM/Accessing+the+UW+CATSIM+Database">here</a>. Follow the step at the beginning to install the necessary tools and then replace step 1 code with the following command line entry with your NERSC username in the proper place:</p>
+
+<pre><code>ssh -L 3307:scidb1.nersc.gov:3306 your_username@cori.nersc.gov
+</code></pre>
+
+<p>Do not worry about step 2 and continue to step 3 where you are instructed to create a db-auth.paf file, but replace the code on the website with the following parameters:</p>
+
+<pre><code>database: {
+  authInfo: {
+    host: '127.0.0.1'
+    port: 3307
+    user: $db_username
+    password: $db_password
+  }
+}
+</code></pre>
+
+<p>If you do not have the $db_username or $db_password and are interested in access please contact a member of the Monitor team for more information.</p>
+
+<h2>
+<a id="demo" class="anchor" href="#demo" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Demo</h2>
+
+<p>See our demo ipython notebook <a href="https://github.com/DarkEnergyScienceCollaboration/Monitor/blob/master/examples/lightcurve_example.ipynb">here</a>.</p>
+
+<h2>
+<a id="people" class="anchor" href="#people" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>People</h2>
+
+<ul>
+<li>
+<a href="https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@jbkalmbach">Bryce Kalmbach</a> (UW)</li>
+<li>
+<a href="https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@drphilmarshall">Phil Marshall</a> (SLAC)</li>
+<li>
+<a href="https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@jchiang87">Jim Chiang</a> (SLAC)</li>
+</ul>
+
+<h2>
+<a id="license-etc" class="anchor" href="#license-etc" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>License etc</h2>
+
+<p>This is open source software, available under the BSD license. If you are interested in this project, please do drop us a line via the hyperlinked contact names above, or by <a href="https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new">writing us an issue</a>.</p>
+        </section>
+
+        <footer>
+          Monitor is maintained by <a href="https://github.com/DarkEnergyScienceCollaboration">DarkEnergyScienceCollaboration</a><br>
+          This page was generated by <a href="https://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
+
+        
+      </div>
+    </div>
+  </body>
+</html>
