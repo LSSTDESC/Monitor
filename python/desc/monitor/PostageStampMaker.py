@@ -34,7 +34,7 @@ class PostageStampMaker(object):
         coord = exposure.getWcs().pixelToSky(x_center, y_center)
         return coord
 
-    def makeBBox(self, ra, dec, arcsec):
+    def make_bbox(self, ra, dec, arcsec):
         """
         Compute the bounding box with sides of size arcsec, centered at
         ra, dec, both in degrees.
@@ -53,7 +53,7 @@ class PostageStampMaker(object):
         Factory method to return the cropped Exposure object with the
         desired geometry.
         """
-        bbox = self.makeBBox(ra, dec, arcsec)
+        bbox = self.make_bbox(ra, dec, arcsec)
         return self.exposure.Factory(self.exposure, bbox)
 
     def create_stamps(self, stamp_specs):
@@ -91,20 +91,3 @@ def convert_image_to_hdu(exposure):
     hdu.header['CRPIX1'] -= x0
     hdu.header['CRPIX2'] -= y0
     return hdu
-
-if __name__ == '__main__':
-    import os
-    import lsst.afw.display.ds9 as ds9
-
-    my_expfile = os.path.join(os.path.split(os.environ['TWINKLES_DIR'])[0],
-                              'tests', 'small_CoaddTempExp.fits.gz')
-
-    my_ra, my_dec, my_arcsec = 53.010895, -27.437648, 10
-    outfile = 'postage_stamp.fits'
-
-    stamp_maker = PostageStampMaker(my_expfile)
-    postage_stamp = stamp_maker.create(my_ra, my_dec, my_arcsec)
-
-    postage_stamp.writeFits(outfile)
-
-    ds9.mtv(postage_stamp.getMaskedImage().getImage())
