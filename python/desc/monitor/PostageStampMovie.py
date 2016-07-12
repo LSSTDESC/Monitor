@@ -24,7 +24,7 @@ class Level2DataService(object):
 
     Parameters
     ----------
-    repo : str
+    repo : str or None, optional
         The output repository from the Level 2 analysis.
     db_info : dict or None, optional
         Connection information for the Level 2 database.  It should
@@ -41,7 +41,7 @@ class Level2DataService(object):
 
     Attributes
     ----------
-    repo : str
+    repo : str or None
         The output repository from the Level 2 analysis.
     conn : desc.pserv.DbConnection
         The connection object that executes the queries to the Level 2 db.
@@ -53,7 +53,7 @@ class Level2DataService(object):
     ~/.lsst/db-auth.paf file.
 
     """
-    def __init__(self, repo, db_info=None):
+    def __init__(self, repo=None, db_info=None):
         """
         Class constructor.
         """
@@ -116,8 +116,35 @@ class Level2DataService(object):
             pickle.dump(pixel_data, output)
         return pixel_data, pickle_file
 
+    def get_deepCoadd_frame(self, band):
+        """Get the deepCoadd frame for the specified band
+
+        Parameters
+        ----------
+        band : str
+            The LSST band (u, g, r, i, z, or y).
+
+        Returns
+        -------
+        str
+            File path to the FITS file containing the coadd the
+            specified band.
+
+        Raises
+        ------
+        RuntimeError
+            If the repo attribute has not been set.
+
+        Notes
+        -----
+        This should be re-implemented to use the Data Butler.
+        """
+        if self.repo is None:
+            raise RuntimeError('Level 2 respository not set.')
+        return os.path.join(self.repo, 'deepCoadd', band, '0/0,0.fits')
+
     def _get_warped_visit_frame(self, band, visit):
-        """Get the deepCoadd tempExp frame.
+        """Get the deepCoadd tempExp frame for the specified band and visit.
 
         Parameters
         ----------
@@ -132,10 +159,17 @@ class Level2DataService(object):
             File path to the FITS file containing the warped exposure for
             the specified band and visit.
 
+        Raises
+        ------
+        RuntimeError
+            If the repo attribute has not been set.
+
         Notes
         -----
         This should be re-implemented to use the Data Butler.
         """
+        if self.repo is None:
+            raise RuntimeError('Level 2 respository not set.')
         return os.path.join(self.repo, 'deepCoadd', band, '0/0,0tempExp',
                             'v%(visit)i-f%(band)s.fits' % locals())
 
@@ -192,6 +226,35 @@ class Level2DataService(object):
                                % locals(),
                                lambda curs: [x[0] for x in curs])
 
+    def get_objects(self, ra, dec, box_size):
+        """Get coadd objects within a box of size box_size x box_size arcsec
+        centered on ra, dec.
+
+        Parameters
+        ----------
+        ra : float
+            Right Ascension (J2000) in degrees
+        dec : float
+            Declination (J2000) in degrees
+        box_size : float
+            Size of search box in arcsec.
+
+        Returns
+        -------
+        dict
+            A dictionary of (RA, Dec) tuples keyed by objectId.
+        """
+        size = box_size/3600.  # convert from arcsec to degrees
+        cos_dec = np.abs(np.cos(dec*np.pi/180.))
+        ra_min, ra_max = ra - size/cos_dec, ra + size/cos_dec
+        dec_min, dec_max = dec - size, dec + size
+        query = '''select objectId, psRa, psDecl from Object obj where
+                   %(ra_min)12.8f < psRa and psRa < %(ra_max)12.8f and
+                   %(dec_min)12.8f < psDecl and psDecl < %(dec_max)12.8f''' \
+            % locals()
+        return self.conn.apply(query, lambda curs: dict([(x[0], x[1:3])
+                                                         for x in curs]))
+
     def get_coords(self, objectId):
         """Get the RA, Dec of the requested object from the Object db table.
 
@@ -221,6 +284,9 @@ class PostageStampMovie(object):
         The id of the object in the Level2 Object db table.
     band : str
         The LSST band (u, g, r, i, z, or y).
+    l2_service : Level2DataService
+        Instance of the class that provides access to the the Level 2
+        output repository and database tables.
     size : int, optional
         The size of the cutout region in arcsec.
         Cutouts of size x size centered on the RA, Dec of the
@@ -297,8 +363,7 @@ class PostageStampMovie(object):
         band = self.band
 
         # Create the coadd postage stamp and use as the initial image.
-        coadd = PostageStampMaker(os.path.join(l2_service.repo, 'deepCoadd',
-                                               band, '0/0,0.fits'))
+        coadd = PostageStampMaker(l2_service.get_deepCoadd_frame(band))
         ra, dec = l2_service.get_coords(objectId)
 
         # Use the coadd to set the image normalization
