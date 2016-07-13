@@ -15,6 +15,7 @@ from collections import OrderedDict
 from lsst.utils import getPackageDir
 from lsst.daf.persistence import DbAuth
 from lsst.sims.photUtils import BandpassDict
+from lsst.sims.catUtils.mixins import Variability as var
 from lsst.sims.catUtils.utils import ObservationMetaDataGenerator as obsGen
 
 
@@ -97,7 +98,8 @@ class RefLightCurves_SL(object):
                  dbConnection=None,
                  dbCursor=None,
                  dbHostName=None,
-                 idSequence=None):
+                 idSequence=None,
+                 t0_mjd=None):
 
         self.columns = columns
         self._dbConnection = dbConnection
@@ -112,64 +114,7 @@ class RefLightCurves_SL(object):
         self.dbHostName = dbHostName
         self.bandPassDict = bandPassDict
         self.observations = observations
-
-    @classmethod
-    def fromTwinklesData(cls,
-                         tableName,
-                         objectTypeID=42,
-                         dbHostName=None,
-                         idCol='snid',
-                         columns=('snid', 'redshift', 'snra', 'sndec', 't0',
-                                  'x0', 'x1', 'c'),
-                         idSequence=None):
-        """
-        Simplified classmethod to construct this class from the Twinkles Run 1
-        perspective.
-
-        Parameters
-        ----------
-        tableName : string, mandatory
-            case insensitive string name of table on database to connect to
-            for model parameters of astrophysical objects
-        idCol : string, optional, defaults to 'snid'
-            column name of Index on the table
-        columns : tuple of strings, optional, defaults to values for SN
-            tuple of strings that completely specify the truth values for
-        idSequence : sequence of one dimension, optional, defaults to None
-            sequence of unique ids in the catsim universe indexing the
-            astrophysical objects in the database.
-        dbHostName : string, optional, defaults to None
-            force the class to use this hostname. If not provided, the class
-            will set this to localhost, which is the desired hostname when
-            using an ssh tunnel. This parameter is useful when working from
-            whitelisted computers.
-
-        Returns
-        ------
-        An instance of the class RefLightCurve class where the other parameters
-        have been defaulted to sensible values for Twinkles Run1 Analysis.
-
-        Examples
-        --------
-        """
-
-        data_dir = os.path.join(os.environ['MONITOR_DIR'], 'data')
-        opsimCsv = os.path.join(data_dir, 'SelectedKrakenVisits.csv')
-        opsimdf = pd.read_csv(opsimCsv, index_col='obsHistID')
-        observations = opsimdf[['expMJD', 'filter', 'fiveSigmaDepth']].copy()
-        del opsimdf
-
-        # Obtain the tuple of total, HardWare bandPassDict and keep the total
-        lsstBP = BandpassDict.loadBandpassesFromFiles()[0]
-        cls = RefLightCurves_SL(tableName=tableName,
-                                objectTypeID=objectTypeID,
-                                idCol=idCol,
-                                dbHostName=dbHostName,
-                                columns=columns,
-                                observations=observations,
-                                bandPassDict=lsstBP,
-                                idSequence=idSequence)
-        return cls
+        self.t0_mjd = t0_mjd
 
     @property
     def dbConnection(self):
@@ -208,8 +153,8 @@ class RefLightCurves_SL(object):
 
     def _generateObsMetaData(self, ra, dec):
         obs_gen = obsGen(self.opsim_database)
-        obs_metadata = obs_gen.getObservationMetaData(fieldRA=(ra-0.05, ra+0.05),
-                                                      fieldDec=(dec-0.05, dec+0.05),
+        obs_metadata = obs_gen.getObservationMetaData(fieldRA=(ra-0.1, ra+0.1),
+                                                      fieldDec=(dec-0.1, dec+0.1),
                                                       limit=1)
         return obs_metadata
 
@@ -246,6 +191,9 @@ class RefLightCurves_SL(object):
                     varParams = varInfo['pars']
                     for k, v in varParams.items():
                         var_dict[k].append(v)
+                    if self.t0_mjd is not None:
+                        for idx in xrange(len(var_dict['t0_mjd'])):
+                            var_dict['t0_mjd'][idx] = self.t0_mjd
                 else:
                     if (col_name == ('raJ2000') or col_name == ('decJ2000')):
                         col_list.append(np.degrees(res_line[col_num]))
@@ -286,174 +234,18 @@ class RefLightCurves_SL(object):
         id = np.asarray(uniqueID) - objTypeID
         return np.right_shift(id, nshift)
 
-    @property
-    def idSequence(self):
-        """
-        An `numpy.ndarray` of IDs indexing the astrophysical objects on the
-        catsim database
-        """
-        if self._idSequence is None:
-            return None
-        x = np.asarray(self._idSequence)
-        return self.uniqueIDtoTableId(x, objTypeID=self.objectID, nshift=10)
+    def agnLightCurve(self, df_row, mjdList):
 
-    def allIdinTable(self, sqlconstraint='', chunksize=None):
-        """
-        return a `pd.Series`of all IDs in the table with an optional
-        constraint specified as sqlconstraint. If chunkSize is not
-        None, but set to an integer, it returns a generator to the
-        series returning chunkSize values at a time.
+        agn_lc = var()
+        lightCurveDicts = []
+        for mjd in mjdList:
+            dmag = agn_lc.applyAgn(df_row, mjd)
+            dmag['mjd'] = mjd
+            lightCurveDicts.append(dmag)
+        agn_lc_df = pd.DataFrame(lightCurveDicts)
 
-        Parameters
-        ----------
-        sqlconstraint : string, optional, defaults to ''
-            sql constraint specified through a WHERE clause
-        chunksize : integer, optional, defaults to None
-            if not None, the return value is a generator to
-            a series getting chunkSize values at a time
+        return agn_lc_df
 
-        Returns
-        -------
-        `pd.Series` of snids or a generator to it returning chunkSize values
-        at at time
-
-        Examples
-        --------
-        >>> ids = reflc.allIdinTable(chunksize=None) # doctest: +SKIP
-        >>> ids.astype(int).values.flatten() # doctest: +SKIP
-        >>> # `numpy.ndarray` of dtype int, having all SNIDs
-        >>> ids = reflc.allIdinTable(chunksize=50) # doctest: +SKIP
-        >>> idsnext().astype(int).values.flatten() # doctest: +SKIP
-        >>> # `numpy.ndarray` of dtype int, having 50 SNIDs,  repeat
-        """
-        query = """SELECT {0} FROM {1}""".format(self.idCol, self.tableName)
-        query += sqlconstraint
-
-        x = pd.read_sql_query(query, con=self.dbConnection,
-                              chunksize=chunksize)
-        return x
-
-    def get_numObjects(self, sqlconstraint=''):
-        """
-        return the number of objects in self.table
-
-        Parameters
-        ----------
-        sqlconstraint : string, optional, defaults to ''
-            sql constraint specified through a WHERE clause
-
-        Returns
-        -------
-        integer number of objects in table (satisfying legal sqlconstraints if
-        specified)
-
-        Examples
-        --------
-        >>> reflc.get_numObjects() #doctest: +SKIP
-        >>> 776620
-        """
-        query = """SELECT COUNT(*) FROM {} """.format(self.tableName)
-        query += sqlconstraint
-        self.dbCursor.execute(query)
-        n = self.dbCursor.fetchone()[0]
-        return n
-
-    def buildquery(self, idValue=None, columns=None):
-        """
-        Return the query statement to be used to obtain model
-        parameters of the set of astrophysical objects
-
-        Parameters
-        ----------
-        idValue : integer, optional, defaults to None
-            unique ID of the astrophysical object. If None, then the query
-            is built for all objects in idSequence. If None, then
-            the query is built for all objects in the table
-        columns : tuple of strings, optional, defaults to None
-            Columns that will be queried, if None, defaults to
-            self.columns
-
-        Returns
-        -------
-        String with a query statement to use to obtain parameters
-
-        Examples
-        --------
-        >>> q = reflc.buildquery(idValue=6144030054709290)
-        """
-        if columns is None:
-            columns = self.columns
-
-        query = """SELECT """
-        query += ", ".join(xx.strip() for xx in columns)
-        query += " FROM {} ".format(self.tableName)
-
-        # if query is for a single idvalue, construct the query stmt
-        if idValue is not None:
-            tableIdValue = self.uniqueIDtoTableId(idValue, objTypeID=28,
-                                                  nshift=10)
-            query += "WHERE {0} = {1}".format(self.idCol, tableIdValue)
-        # if idValue is not supplied, but an idSequence is supplied
-        elif self.idSequence is not None:
-            query += "WHERE {0} in {1}".format(self.idCol,
-                                               tuple(self.idSequence))
-        # Else get the entire table, no WHERE clause
-        else:
-            pass
-        return query
-
-    def get_params(self, idValue=None):
-        """
-        return parameters of the objects with the desired columns as a
-        `pandas.DataFrame`
-
-        Parameters
-        ----------
-        idValue : int, optional, defaults to None
-            indexes of the astrophysical objects whose parameters are to be
-            obtained. If idValue is None, then all astrophysical objects with
-            ids in `self.idSequence` are used. If `self.idSequence` is None,
-            then all astrophysical objects are used.
-        Returns
-        -------
-        A DataFrame with a single row if idValue is supplied, or a DataFrame
-        with all objects in the table with properties in self.columns
-        """
-        df = pd.read_sql_query(self.buildquery(idValue=idValue),
-                               self.dbConnection,
-                               index_col=self.idCol,
-                               coerce_float=False)
-        return df
-
-    def astro_object(self, idValue, mjdOffset=59580.):
-        """
-        instance of the catsim representation of the astrophysical object.
-
-        Parameters
-        ----------
-        idValue : int, mandatory
-            index of the astro_object
-        mjdOffset : float, optional, defaults to 59580.
-            offset in time parameters in the database for the transient objects
-
-        Returns
-        -------
-        Instance of astro_object with parameters from the database
-
-        Examples
-        --------
-        >>> sn = reflc.astro_object(idValue=6001163623700)
-
-        """
-        df = self.get_params(idValue)
-        sn = SNObject(ra=df.snra.values[0], dec=df.sndec.values[0])
-        paramDict = dict()
-        for param in ['t0', 'x0', 'x1', 'c']:
-            paramDict[param] = df[param].values
-        paramDict['t0'] += mjdOffset
-        paramDict['z'] = df.redshift.values[0]
-        sn.set(**paramDict)
-        return sn
 
     def lightCurve(self, idValue,
                    bandName=None,
