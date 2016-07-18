@@ -11,12 +11,14 @@ from lsst.sims.catUtils.supernovae import SNObject
 import pymssql
 import os
 import json
+from astropy.table import Table
 from collections import OrderedDict
 from lsst.utils import getPackageDir
 from lsst.daf.persistence import DbAuth
 from lsst.sims.photUtils import BandpassDict
 from lsst.sims.catUtils.mixins import Variability as var
 from lsst.sims.catUtils.utils import ObservationMetaDataGenerator as obsGen
+from lsst.sims.utils import ObservationMetaData
 
 
 __all__ = ['RefLightCurves_SL']
@@ -151,12 +153,141 @@ class RefLightCurves_SL(object):
             self._dbCursor = self.dbConnection.cursor()
         return self._dbCursor
 
+    def load_truth_lens_catalog(self, agn_truth_file, lens_truth_file,
+                                om10_catalog):
+
+        sprinkled_agn_images = pd.read_csv(agn_truth_file)
+
+        om10_id = []
+        image_num = []
+        galtileid = []
+        print('Reading AGN Info')
+        for agn_id in sprinkled_agn_images['objId']:
+            galtileid.append(np.int(np.floor(np.right_shift(agn_id-28, 10)/10000)))
+            om10_id.append(int(int(str(np.right_shift(agn_id-28,10))[-4:])/4))
+            image_num.append(int(str(np.right_shift(agn_id-28,10))[-4:])%4)
+        galtileid = np.array(galtileid)
+        galtileid = np.left_shift(galtileid, 10) + 26
+        om10_id = np.array(om10_id)
+        image_num = np.array(image_num)
+
+        sprinkled_agn_images.loc[:,'galtileid'] = galtileid
+        sprinkled_agn_images.loc[:,'om10_id'] = om10_id
+        sprinkled_agn_images.loc[:,'om10_image_num'] = image_num
+
+        hdulist = Table.read(om10_catalog)
+
+        om10_info = pd.DataFrame(data=[list(hdulist['XSRC']),
+                                       list(hdulist['YSRC']),
+                                       list(hdulist['APMAG_I']),
+                                       list(hdulist['XIMG']),
+                                       list(hdulist['YIMG']),
+                                       list(hdulist['DELAY']),
+                                       list(hdulist['MAG']),]).T
+        om10_info.columns = ['XSRC', 'YSRC', 'Src_Mag',
+                             'XIMG', 'YIMG', 'Delay',
+                             'Im_Mag']
+        om10_info.reindex(index=hdulist['twinklesId'])
+
+        time_delays = []
+        im_mag_list = []
+
+        print('Loading OM10 info now')
+        for row in sprinkled_agn_images.iterrows():
+            om10_entry = row[1]['om10_id']
+            om10_im_num = row[1]['om10_image_num']
+            time_delays.append(om10_info.ix[om10_entry]['Delay'][om10_im_num])
+            im_mag_list.append(om10_info.ix[om10_entry]['Im_Mag'][om10_im_num])
+
+        om10_dict = {'time_delays': time_delays,
+                     'im_magnification': im_mag_list}
+
+        image_info = pd.DataFrame(om10_dict)
+        total_image_info = pd.concat([sprinkled_agn_images, image_info],
+                                     axis=1)
+
+        adj_mag = total_image_info['mag'] - \
+            2.5*np.log10(np.abs(total_image_info['im_magnification']))
+
+        total_image_info['adjusted_mag'] = adj_mag
+
+        lens_galaxy_df = pd.read_csv(lens_truth_file)
+
+        lens_gal_ra = []
+        lens_gal_dec = []
+        lens_gal_mag = []
+        lens_gal_z = []
+        print('Loading Lens Galaxy info now')
+        for row in sprinkled_agn_images.iterrows():
+            lens_gal_entry = lens_galaxy_df[lens_galaxy_df['objId']==
+                                            row[1]['galtileid']]
+            lens_gal_ra.append(lens_gal_entry['ra'].values[0])
+            lens_gal_dec.append(lens_gal_entry['dec'].values[0])
+            lens_gal_mag.append(lens_gal_entry['mag'].values[0])
+            lens_gal_z.append(lens_gal_entry['redshift'].values[0])
+
+        lens_gal_dict = OrderedDict()
+        lens_gal_dict['lens_ra'] = lens_gal_ra
+        lens_gal_dict['lens_dec'] = lens_gal_dec
+        lens_gal_dict['lens_mag'] = lens_gal_mag
+        lens_gal_dict['lens_redshift'] = lens_gal_z
+
+        lens_gal_info = pd.DataFrame(lens_gal_dict)
+        total_image_info = pd.concat([total_image_info, lens_gal_info],
+                                     axis=1)
+
+        var_info_dict = OrderedDict()
+        for key_name in ['t0_mjd', 'seed', 'agn_tau', 'agn_sfu', 'agn_sfg',
+                         'agn_sfr', 'agn_sfi', 'agn_sfz', 'agn_sfy']:
+            var_info_dict[key_name] = []
+
+        i=0
+        percent_thru = .10
+        last_lens_id = 0
+        print('Querying fatboy now')
+        for row in total_image_info.iterrows():
+
+            if float(i)/total_image_info.shape[0] >= percent_thru:
+                print(str(str(100*percent_thru) + ' percent done'))
+                percent_thru += .1
+
+            ra_entry = row[1]['lens_ra']
+            dec_entry = row[1]['lens_dec']
+            lens_id_entry = row[1]['galtileid']
+
+            if lens_id_entry != last_lens_id:
+
+                var_params = self.get_sl_params(ra_entry, dec_entry)
+                var_entry = var_params[(var_params['raJ2000'] < ra_entry+0.0001) &
+                                       (var_params['raJ2000'] > ra_entry-0.0001) &
+                                       (var_params['decJ2000'] <
+                                        dec_entry+0.0001) &
+                                       (var_params['decJ2000'] > dec_entry-0.0001)]
+
+                last_lens_id = lens_id_entry
+
+            for k, v in var_info_dict.iteritems():
+                v.append((var_entry[k]).values[0])
+            i+=1
+
+        var_info_df = pd.DataFrame(var_info_dict)
+
+        total_image_info = pd.concat([total_image_info, var_info_df],
+                                     axis=1)
+
+        return total_image_info
+
     def _generateObsMetaData(self, ra, dec):
-        obs_gen = obsGen(self.opsim_database)
-        obs_metadata = obs_gen.getObservationMetaData(fieldRA=(ra-0.1, ra+0.1),
-                                                      fieldDec=(dec-0.1, dec+0.1),
-                                                      limit=1)
-        return obs_metadata
+
+        # obs_gen = obsGen(self.opsim_database)
+        # obs_metadata = obs_gen.getObservationMetaData(fieldRA=(ra-0.3, ra+0.3),
+        #                                               fieldDec=(dec-0.3,
+        #                                                         dec+0.3))
+        obs_metadata = ObservationMetaData(boundType = 'circle',
+                                           pointingRA = ra,
+                                           pointingDec = dec,
+                                           boundLength = 0.05, mjd = 53900.0)
+        return [obs_metadata]
 
     def _query_columns(self, obs_metadata):
         gto = bcm.GalaxyAgnObj()
@@ -237,15 +368,17 @@ class RefLightCurves_SL(object):
     def agnLightCurve(self, df_row, mjdList):
 
         agn_lc = var()
-        lightCurveDicts = []
-        for mjd in mjdList:
-            dmag = agn_lc.applyAgn(df_row, mjd)
-            dmag['mjd'] = mjd
-            lightCurveDicts.append(dmag)
-        agn_lc_df = pd.DataFrame(lightCurveDicts)
+        # lightCurveDicts = []
+        lc_val = np.ones(len(mjdList))*df_row['adjusted_mag']
+        for day_num in range(len(mjdList)):
+            dmag = agn_lc.applyAgn(df_row, mjdList[day_num])
+            # dmag['mjd'] = mjd
+            lc_val[day_num] += dmag['u']
+            # lightCurveDicts.append(dmag)
+        # agn_lc_df = pd.DataFrame(lightCurveDicts)
 
-        return agn_lc_df
-
+        # return agn_lc_df
+        return lc_val
 
     def lightCurve(self, idValue,
                    bandName=None,
