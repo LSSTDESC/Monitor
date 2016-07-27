@@ -8,8 +8,6 @@ from astropy.visualization.mpl_normalize import ImageNormalize
 import astropy.wcs
 import matplotlib.pyplot as plt
 
-__all__ = ['image_norm', 'render_fits_image']
-
 def image_norm(image_data, stretch=viz.AsinhStretch):
     """
     Create the ImageNormalize object based on the desired stretch and
@@ -44,4 +42,4 @@ def render_fits_image(hdu, cmap=plt.cm.gray, stretch=viz.AsinhStretch,
     plt.ylabel(ylabel)
     if title is not None:
         axes.set_title(title)
-    return fig, axes, norm
+    return fig, axes, im, norm
