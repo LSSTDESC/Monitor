@@ -38,6 +38,11 @@ class Level2DataService(object):
 
         {'database': 'DESC_Twinkles_Level_2',
          'host': 'scidb1.nersc.gov'}
+    project : str or None, optional
+        The name of the DESC project.  This is part of the primary key
+        in the pserv Level 2 database tables, so it is generally
+        needed to differentiate results from different projects using
+        the same database instance.
 
     Attributes
     ----------
@@ -45,6 +50,8 @@ class Level2DataService(object):
         The output repository from the Level 2 analysis.
     conn : desc.pserv.DbConnection
         The connection object that executes the queries to the Level 2 db.
+    project : str or None
+        The name of the DESC project.
 
     Notes
     -----
@@ -53,7 +60,7 @@ class Level2DataService(object):
     ~/.lsst/db-auth.paf file.
 
     """
-    def __init__(self, repo=None, db_info=None):
+    def __init__(self, repo=None, db_info=None, project=None):
         """
         Class constructor.
         """
@@ -62,6 +69,7 @@ class Level2DataService(object):
             db_info = dict(database='DESC_Twinkles_Level_2',
                            host='scidb1.nersc.gov')
         self.conn = DbConnection(**db_info)
+        self.project = project
 
     def get_pixel_data(self, objectId, band, size=10, pickle_file=None):
         """Get the pixel data for a cutout region for all visits.
@@ -201,8 +209,11 @@ class Level2DataService(object):
         query = """select cv.obsStart, fs.psFlux, fs.psFlux_Sigma from
                CcdVisit cv join ForcedSource fs on cv.ccdVisitId=fs.ccdVisitId
                join Object obj on fs.objectId=obj.objectId where
-               cv.filterName='%(band)s' and fs.objectId=%(objectId)i
-               order by cv.obsStart asc""" % locals()
+               cv.filterName='%(band)s' and fs.objectId=%(objectId)i""" \
+            % locals()
+        if self.project is not None:
+            query += " and cv.project='%s'" % self.project
+        query += " order by cv.obsStart asc"
         rows = self.conn.apply(query, lambda curs: np.array([x for x in curs]))
         obsStart, flux, fluxerr = (np.array(col) for col in rows.transpose())
         mjd = astropy.time.Time(obsStart).mjd
@@ -252,6 +263,8 @@ class Level2DataService(object):
                    %(ra_min)12.8f < psRa and psRa < %(ra_max)12.8f and
                    %(dec_min)12.8f < psDecl and psDecl < %(dec_max)12.8f''' \
             % locals()
+        if self.project is not None:
+            query += " and project='%s'" % self.project
         return self.conn.apply(query, lambda curs: dict([(x[0], x[1:3])
                                                          for x in curs]))
 
