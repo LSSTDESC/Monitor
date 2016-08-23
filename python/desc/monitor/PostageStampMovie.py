@@ -38,6 +38,10 @@ class Level2DataService(object):
 
         {'database': 'DESC_Twinkles_Level_2',
          'host': 'scidb1.nersc.gov'}
+    tract : int or str, optional
+        The "tract", as assigned by the LSST Stack.
+    patch : str, optional
+        The "patch", as assigned by the LSST Stack, e.g., "0,0".
     project : str or None, optional
         The name of the DESC project.  This is part of the primary key
         in the pserv Level 2 database tables, so it is generally
@@ -52,6 +56,10 @@ class Level2DataService(object):
         The connection object that executes the queries to the Level 2 db.
     project : str or None
         The name of the DESC project.
+    tract : str
+        The "tract", as assigned by the LSST Stack.
+    patch : str
+        The "patch", as assigned by the LSST Stack, e.g., "0,0".
 
     Notes
     -----
@@ -60,7 +68,8 @@ class Level2DataService(object):
     ~/.lsst/db-auth.paf file.
 
     """
-    def __init__(self, repo=None, db_info=None, project=None):
+    def __init__(self, repo=None, db_info=None, tract='0', patch='0,0',
+                 project=None):
         """
         Class constructor.
         """
@@ -69,6 +78,8 @@ class Level2DataService(object):
             db_info = dict(database='DESC_Twinkles_Level_2',
                            host='scidb1.nersc.gov')
         self.conn = DbConnection(**db_info)
+        self.tract = str(tract)
+        self.patch = patch
         self.project = project
 
     def get_pixel_data(self, objectId, band, size=10, pickle_file=None):
@@ -149,7 +160,8 @@ class Level2DataService(object):
         """
         if self.repo is None:
             raise RuntimeError('Level 2 respository not set.')
-        return os.path.join(self.repo, 'deepCoadd', band, '0/0,0.fits')
+        return os.path.join(self.repo, 'deepCoadd', band,
+                            self.tract, self.patch + '.fits')
 
     def _get_warped_visit_frame(self, band, visit):
         """Get the deepCoadd tempExp frame for the specified band and visit.
@@ -178,7 +190,8 @@ class Level2DataService(object):
         """
         if self.repo is None:
             raise RuntimeError('Level 2 respository not set.')
-        return os.path.join(self.repo, 'deepCoadd', band, '0/0,0tempExp',
+        return os.path.join(self.repo, 'deepCoadd', band,
+                            self.tract, self.patch + 'tempExp',
                             'v%(visit)i-f%(band)s.fits' % locals())
 
     def get_light_curve(self, objectId, band):
@@ -208,11 +221,11 @@ class Level2DataService(object):
         """
         query = """select cv.obsStart, fs.psFlux, fs.psFlux_Sigma from
                CcdVisit cv join ForcedSource fs on cv.ccdVisitId=fs.ccdVisitId
-               join Object obj on fs.objectId=obj.objectId where
-               cv.filterName='%(band)s' and fs.objectId=%(objectId)i""" \
+               and cv.project=fs.project
+               where cv.filterName='%(band)s' and fs.objectId=%(objectId)i""" \
             % locals()
         if self.project is not None:
-            query += " and cv.project='%s'" % self.project
+            query += " and fs.project='%s'" % self.project
         query += " order by cv.obsStart asc"
         rows = self.conn.apply(query, lambda curs: np.array([x for x in curs]))
         obsStart, flux, fluxerr = (np.array(col) for col in rows.transpose())
@@ -232,10 +245,13 @@ class Level2DataService(object):
         list
             A list of visitIds from the CcdVisit table.
         """
-        return self.conn.apply('''select visitId from CcdVisit where
-                                  filterName='%(band)s' order by visitId'''
-                               % locals(),
-                               lambda curs: [x[0] for x in curs])
+        query = """select visitId from CcdVisit where
+                   filterName='%(band)s'""" % locals()
+        if self.project is not None:
+            query += " and project='%s'" % self.project
+        query += " order by visitId"
+        return np.unique(self.conn.apply(query,
+                                         lambda curs: [x[0] for x in curs]))
 
     def get_objects(self, ra, dec, box_size):
         """Get coadd objects within a box of size box_size x box_size arcsec
