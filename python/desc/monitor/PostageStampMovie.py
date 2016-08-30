@@ -409,7 +409,7 @@ class PostageStampMovie(object):
         axes.scatter([ra], [dec], transform=axes.get_transform('icrs'),
                      color='red', alpha=0.8)
         plt.axis(axis_range)   # restore axis range to fit image
-        self.fig.add_subplot(212)
+        self.lc_subplot = self.fig.add_subplot(212)
         self.light_curve = l2_service.get_light_curve(objectId, band)
         plt.errorbar(self.light_curve['mjd'], self.light_curve['flux'],
                      yerr=self.light_curve['fluxerr'], fmt='.')
@@ -448,6 +448,26 @@ class PostageStampMovie(object):
         return animation.FuncAnimation(self.fig, self, frames=self.index,
                                        interval=interval)
 
+    def make_gif(self, outfile, frames=None, interval=200):
+        """
+        Make a gif movie of the animation.
+
+        Parameters
+        ----------
+        outfile : str
+            Filename of the gif file.
+        frames : int, optional
+            The number of frames to render (always starting from frame zero).
+            By default, all of the frames are rendered.
+        interval : int
+            The interval time between frames in msec.
+        """
+        if frames is None:
+            frames = self._nmax
+        anim = animation.FuncAnimation(self.fig, self, frames=frames,
+                                       interval=interval)
+        anim.save(outfile)
+
     def index(self):
         """Generator that returns the frame number to display.
 
@@ -460,8 +480,19 @@ class PostageStampMovie(object):
             yield self._num
             if not self._pause or self._update:
                 self._num += 1
-            if self._num >= self._nmax or self._num < 0:
-                self._num = 0
+            if not self._within_frame_range():
+                self._num = self._min_frame()
+
+    def _within_frame_range(self):
+        return self._min_frame() < self._num and self._num < self._max_frame()
+
+    def _min_frame(self):
+        xmin, xmax = self.lc_subplot.get_xbound()
+        return max(0, np.where(self.light_curve['mjd'] > xmin)[0][0])
+
+    def _max_frame(self):
+        xmin, xmax = self.lc_subplot.get_xbound()
+        return min(self._nmax, np.where(self.light_curve['mjd'] < xmax)[0][-1])
 
     def __call__(self, i):
         """Call-back to set the data in the image for the ith frame.
