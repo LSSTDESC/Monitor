@@ -27,7 +27,7 @@ class RefLightCurves(object):
     tableName : string, mandatory
         case insensitive string name of table on database to connect to
         for model parameters of astrophysical objects
-    idCol : string, optional, defaults to 'snid'
+    idCol : string, optional, defaults to 'id'
         column name of Index on the table
     observations : `pd.DataFrame`, optional, defaults to None
         if None, some information may need to be supplied in using certain
@@ -84,8 +84,8 @@ class RefLightCurves(object):
     def __init__(self,
                  tableName,
                  objectTypeID=42,
-                 idCol='snid',
-                 columns=('snid', 'redshift', 'snra', 'sndec', 't0', 'x0',
+                 idCol='id',
+                 columns=('id', 'redshift', 'snra', 'sndec', 't0', 'x0',
                           'x1', 'c'),
                  observations=None,
                  bandPassDict=None,
@@ -112,8 +112,8 @@ class RefLightCurves(object):
                          tableName,
                          objectTypeID=42,
                          dbHostName=None,
-                         idCol='snid',
-                         columns=('snid', 'redshift', 'snra', 'sndec', 't0',
+                         idCol='id',
+                         columns=('id', 'redshift', 'snra', 'sndec', 't0',
                                   'x0', 'x1', 'c'),
                          idSequence=None):
         """
@@ -125,7 +125,7 @@ class RefLightCurves(object):
         tableName : string, mandatory
             case insensitive string name of table on database to connect to
             for model parameters of astrophysical objects
-        idCol : string, optional, defaults to 'snid'
+        idCol : string, optional, defaults to 'id'
             column name of Index on the table
         columns : tuple of strings, optional, defaults to values for SN
             tuple of strings that completely specify the truth values for
