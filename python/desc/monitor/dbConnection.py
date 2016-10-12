@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 import numpy as np
-from lsst.sims.catalogs.generation.db import DBObject
+from lsst.sims.catalogs.db import DBObject
 
 __all__ = ['dbInterface']
 
