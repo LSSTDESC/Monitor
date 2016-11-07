@@ -5,8 +5,7 @@
 #
 
 MINICONDA_VERSION=${MINICONDA_VERSION:-3.19.0}			# you can use "latest" if you don't care
-#CHANNEL=${CHANNEL:-"http://research.majuric.org/conda/dev"}	# the URL to the conda channel where LSST conda packages reside
-CHANNEL=${CHANNEL:-"http://conda.lsst.codes/sims"}	# the URL to the conda channel where LSST conda packages reside
+CHANNEL=${CHANNEL:-"http://conda.lsst.codes/sims/2.3.1"}
 PACKAGES="$@"							# the top-level LSST package you want installed (lsst-distrib for DM, lsst-sims for simulations)
 
 ########################################################################################################
