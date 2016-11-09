@@ -145,6 +145,7 @@ class LightCurve(object):
         lightcurve = {}
         lightcurve['bandpass'] = [str('lsst' + x) for x in fs_info['filter']]
         timestamp = Time(fs_info['obs_start'], scale='utc')
+        lightcurve['obsHistId'] = fs_info['visit_id']
         lightcurve['mjd'] = timestamp.mjd
         lightcurve['ra'] = [obj_info['ra'][0]]*num_results
         lightcurve['dec'] = [obj_info['dec'][0]]*num_results
