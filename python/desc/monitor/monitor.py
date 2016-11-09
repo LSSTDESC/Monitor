@@ -132,7 +132,7 @@ class LightCurve(object):
 
         if objid is not None:
             obj_info = self.dbConn_lc.objectFromId(objid)
-            fs_results = self.dbConn_lc.forcedSourceFromId(objid)
+            fs_info = self.dbConn_lc.all_fs_visits_from_id(objid)
 
         if ra_dec is not None:
             obj_info = self.dbConn_lc.objectFromRaDec(ra_dec[0], ra_dec[1], tol)
@@ -141,28 +141,17 @@ class LightCurve(object):
             elif len(obj_info) > 1:
                 print(obj_info)
 
+        num_results = len(fs_info)
         lightcurve = {}
-        lightcurve['bandpass'] = []
-        lightcurve['mjd'] = []
-        lightcurve['ra'] = []
-        lightcurve['dec'] = []
-        lightcurve['flux'] = []
-        lightcurve['flux_error'] = []
-        lightcurve['zp'] = []
-        lightcurve['zpsys'] = []
-
-        for visit in fs_results:
-            visit_info = self.dbConn_lc.visitFromCcdVisitId(visit['ccd_visit_id'])
-            lightcurve['bandpass'].append(str('lsst' +
-                                              visit_info['filter'][0]))
-            timestamp = Time(visit_info['obs_start'][0], scale='utc')
-            lightcurve['mjd'].append(timestamp.mjd)
-            lightcurve['ra'].append(obj_info['ra'][0])
-            lightcurve['dec'].append(obj_info['dec'][0])
-            lightcurve['flux'].append(visit['psf_flux'])
-            lightcurve['flux_error'].append(visit['psf_flux_err'])
-            lightcurve['zp'].append(25.0) ### TEMP
-            lightcurve['zpsys'].append('ab') ### TEMP
+        lightcurve['bandpass'] = [str('lsst' + x) for x in fs_info['filter']]
+        timestamp = Time(fs_info['obs_start'], scale='utc')
+        lightcurve['mjd'] = timestamp.mjd
+        lightcurve['ra'] = [obj_info['ra'][0]]*num_results
+        lightcurve['dec'] = [obj_info['dec'][0]]*num_results
+        lightcurve['flux'] = fs_info['psf_flux']
+        lightcurve['flux_error'] = fs_info['psf_flux_err']
+        lightcurve['zp'] = [25.0]*num_results #TEMP
+        lightcurve['zpsys'] = ['ab']*num_results #TEMP
 
         self.lightcurve = Table(data=lightcurve)
 
