@@ -19,7 +19,6 @@ from astropy.time import Time
 from astropy.io import fits
 from astropy.table import Table
 from lsst.utils import getPackageDir
-from .dbConnection import dbInterface as dbi
 
 __all__ = ['Monitor', 'LightCurve']
 # ==============================================================================
