@@ -28,17 +28,16 @@ class Monitor(object):
     '''
     Simple class for extracting DM forced photometry light curves.
     '''
-    def __init__(self):
+    def __init__(self, dbConn):
+        self.dbConn = dbConn
         return
 
-    def read(self, photfile):
-        print("Cannot read data from", photfile, "yet.")
+    def measure_depth_curve():
+        """
+        """
         return
 
-    def run(self, algorithm=None):
-        if algorithm is None:
-            print("No algorithms coded yet.")
-        return
+
 
 # =============================================================================
 
@@ -48,8 +47,10 @@ class LightCurve(object):
     Fetch ForcedSource data with Butler and package for use with accompanying
     visualization routines.
     '''
-    def __init__(self, fp_table_dir=None, mjd_file=None,
+    def __init__(self, dbConn, fp_table_dir=None, mjd_file=None,
                  filter_list=['u', 'g', 'r', 'i', 'z', 'y']):
+
+        self.dbConn_lc = dbConn
 
         for filter_name in filter_list:
             bandpass_file = os.path.join(str(getPackageDir('throughputs') +
@@ -117,10 +118,8 @@ class LightCurve(object):
                     lightcurve['zpsys'].append('ab')
         self.lightcurve = Table(data=lightcurve)
 
-    def build_lightcurve_from_db(self, objid=None, ra_dec=None, tol=0.005,
-                                 database='DESC_Twinkles_Level_2',
-                                 host='127.0.0.1', port='3307',
-                                 driver='mysql'):
+    def build_lightcurve_from_db(self, objid=None, ra_dec=None,
+                                 tol=0.005):
         """
         Assemble a light curve data table from available files.
         """
@@ -131,14 +130,12 @@ class LightCurve(object):
             raise ValueError(str('Please specify only one of objid or ' +
                                  'ra,dec location.'))
 
-        dbConn_lc = dbi(database=database, host=host, port=port, driver=driver)
-
         if objid is not None:
-            obj_info = dbConn_lc.objectFromId(objid)
-            fs_results = dbConn_lc.forcedSourceFromId(objid)
+            obj_info = self.dbConn_lc.objectFromId(objid)
+            fs_results = self.dbConn_lc.forcedSourceFromId(objid)
 
         if ra_dec is not None:
-            obj_info = dbConn_lc.objectFromRaDec(ra_dec[0], ra_dec[1], tol)
+            obj_info = self.dbConn_lc.objectFromRaDec(ra_dec[0], ra_dec[1], tol)
             if len(obj_info) == 0:
                 raise ValueError('No objects within specified ra,dec range.')
             elif len(obj_info) > 1:
@@ -155,7 +152,7 @@ class LightCurve(object):
         lightcurve['zpsys'] = []
 
         for visit in fs_results:
-            visit_info = dbConn_lc.visitFromCcdVisitId(visit['ccd_visit_id'])
+            visit_info = self.dbConn_lc.visitFromCcdVisitId(visit['ccd_visit_id'])
             lightcurve['bandpass'].append(str('lsst' +
                                               visit_info['filter'][0]))
             timestamp = Time(visit_info['obs_start'][0], scale='utc')
