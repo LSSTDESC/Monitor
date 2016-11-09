@@ -36,6 +36,28 @@ class dbInterface(object):
         results = self._dbo.execute_arbitrary(query, dtype=dtype)
         return results
 
+    def all_fs_visits_from_id(self, objectId):
+
+        dtype = np.dtype([('object_id', np.int),
+                          ('ccd_visit_id', np.int),
+                          ('psf_flux', np.float),
+                          ('psf_flux_err', np.float),
+                          ('flags', np.int),
+                          ('visit_id', np.int),
+                          ('filter', str, 300),
+                          ('obs_start', str, 300)])
+        query = """
+                select ForcedSource.objectId, ForcedSource.ccdVisitId,
+                       ForcedSource.psFlux, ForcedSource.psFlux_Sigma,
+                       ForcedSource.flags, CcdVisit.visitId,
+                       CcdVisit.filterName, CcdVisit.obsStart
+                from ForcedSource
+                inner join CcdVisit on
+                       ForcedSource.ccdVisitId = CcdVisit.ccdVisitId
+                       and ForcedSource.objectId = %i""" % objectId
+        results = self._dbo.execute_arbitrary(query, dtype=dtype)
+        return results
+
     def objectFromId(self, objectId):
 
         dtype = np.dtype([('object_id', np.int),
