@@ -73,15 +73,6 @@ class Monitor(object):
 
         return dc
 
-    def get_depth(self, ccd_visit_id, star_ids):
-        """
-        Get the 5-sigma limiting depth for a single visit.
-        """
-
-        #visit_data = self.dbConn.
-
-        return
-
     def get_stars(self, fainter_than=None):
         """
         Get the stars from the pserv database for a visit.
@@ -281,8 +272,7 @@ class LightCurve(object):
                 plt.errorbar(filt_mjd, using_mjd, yerr=using_error_mjd,
                          ls='None', marker='.', ms=3, c=color[plot_num-1])
             else:
-                plt.scatter(filt_mjd, using_mjd, c='r', marker='+')#,
-                            #ls='None', marker='.', ms=3, c=color[plot_num-1])
+                plt.scatter(filt_mjd, using_mjd, c='purple', marker='+')
             plt.locator_params(axis='x',nbins=5)
             plt.xlabel('mjd')
             if using == 'flux':
