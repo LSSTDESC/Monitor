@@ -11,7 +11,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import os
-# import pandas as pd
+import pandas as pd
 import numpy as np
 import sncosmo
 import astropy.units as u
@@ -49,7 +49,6 @@ class Monitor(object):
         """
         Find the 5-sigma limiting depth in each visit.
         """
-
         visit_data = self.dbConn.get_all_visit_info()
         stars = self.get_stars()
         visit_flux_err = []
@@ -69,9 +68,19 @@ class Monitor(object):
         depth_curve['mag_error'] = np.zeros(self.num_visits)
 
         dc = LightCurve(self.dbConn)
-        dc.lightcurve = Table(data=depth_curve)
+        dc.build_lightcurve(depth_curve)
 
         return dc
+
+    def measure_seeing_curve(self):
+        """
+        Find the seeing in each visit.
+        """
+
+        visit_data = self.dbConn.get_all_visit_info()
+
+        sc = SeeingCurve.build
+
 
     def get_stars(self, fainter_than=None):
         """
@@ -121,11 +130,12 @@ class Monitor(object):
 # =============================================================================
 
 
-class LightCurve(object):
-    '''
-    Fetch ForcedSource data with Butler and package for use with accompanying
-    visualization routines.
-    '''
+class BaseCurve(object):
+    """
+    A Base Class used to initialize the curve methods: LightCurve and
+    SeeingCurve.
+    """
+
     def __init__(self, dbConn, fp_table_dir=None, mjd_file=None,
                  filter_list=['u', 'g', 'r', 'i', 'z', 'y']):
 
@@ -165,9 +175,19 @@ class LightCurve(object):
                 visit_num = visit_dir[1:-3]
                 self.visit_map[visit_band].append(visit_num)
 
-    def build_lightcurve(self, objid):
+class LightCurve(BaseCurve):
+
+    def build_lightcurve(self, lc_dict):
         """
-        Assemble a light curve data table from available files.
+        A wrapper around pd.read_dict to build a lightcurve from a dict.
+        """
+
+        self.lightcurve = pd.DataFrame.from_dict(lc_dict)
+
+    def build_lightcurve_from_fp_table(self, objid):
+        """
+        Assemble a light curve data table from available forced photometry
+        in a data repo.
         """
         lightcurve = {}
         lightcurve['bandpass'] = []
@@ -196,7 +216,7 @@ class LightCurve(object):
                     lightcurve['flux_error'].append(obj_data['base_PsfFlux_fluxSigma'][0])
                     lightcurve['zp'].append(25.0)
                     lightcurve['zpsys'].append('ab')
-        self.lightcurve = Table(data=lightcurve)
+        self.build_lightcurve(lightcurve)
 
     def build_lightcurve_from_db(self, objid=None, ra_dec=None,
                                  tol=0.005):
@@ -236,7 +256,7 @@ class LightCurve(object):
         lightcurve['zp'] = [25.0]*num_results #TEMP
         lightcurve['zpsys'] = ['ab']*num_results #TEMP
 
-        self.lightcurve = Table(data=lightcurve)
+        self.build_lightcurve(lightcurve)
 
     def visualize_lightcurve(self, using='flux', include_errors=True,
                              use_existing_fig = None):
@@ -248,8 +268,6 @@ class LightCurve(object):
         if self.lightcurve is None:
             raise ValueError('No lightcurve yet. Use build_lightcurve first.')
 
-        #if using == 'flux':
-            #fig = plt.figure()#sncosmo.plot_lc(self.lightcurve)
         n_subplot = len(self.filter_list)
         n_col = 2
         n_row = (n_subplot - 1) // n_col + 1
@@ -265,10 +283,10 @@ class LightCurve(object):
             fig.add_subplot(n_row, n_col, plot_num)
             filt_name = str('lsst' + filt)
             plt.title(filt_name)
-            filt_mjd = self.lightcurve['mjd'][np.where(self.lightcurve['bandpass']==filt_name)]
-            using_mjd = self.lightcurve[using][np.where(self.lightcurve['bandpass']==filt_name)]
+            filt_mjd = self.lightcurve['mjd'][self.lightcurve['bandpass']==filt_name].values
+            using_mjd = self.lightcurve[using][self.lightcurve['bandpass']==filt_name].values
             if include_errors is True:
-                using_error_mjd = self.lightcurve[str(using+'_error')][np.where(self.lightcurve['bandpass']==filt_name)]
+                using_error_mjd = self.lightcurve[str(using+'_error')][self.lightcurve['bandpass']==filt_name].values
                 plt.errorbar(filt_mjd, using_mjd, yerr=using_error_mjd,
                          ls='None', marker='.', ms=3, c=color[plot_num-1])
             else:
@@ -284,10 +302,18 @@ class LightCurve(object):
                     plt.gca().invert_yaxis()
             plot_num += 1
         plt.tight_layout()
-        #elif using == 'mag':
-        #    fig = plt.figure()
-
 
         return fig
 
 # ==============================================================================
+
+class SeeingCurve(BaseCurve):
+    """
+    An object to store the seeing information from all visits in the survey.
+    """
+
+    def visualize_seeing_curve():
+
+
+
+        return
