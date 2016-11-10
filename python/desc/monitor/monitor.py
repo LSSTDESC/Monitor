@@ -15,10 +15,12 @@ import os
 import numpy as np
 import sncosmo
 import astropy.units as u
+import matplotlib.pyplot as plt
 from astropy.time import Time
 from astropy.io import fits
 from astropy.table import Table
 from lsst.utils import getPackageDir
+plt.style.use('ggplot')
 
 __all__ = ['Monitor', 'LightCurve']
 # ==============================================================================
@@ -29,12 +31,99 @@ class Monitor(object):
     '''
     def __init__(self, dbConn):
         self.dbConn = dbConn
+        self.return_lightcurve = {}
+        self.num_visits = self.dbConn.get_number_of_visits()
         return
 
-    def measure_depth_curve():
+    def get_lightcurves(self, lc_list):
         """
+        Get the database information for a list of lightcurves and store it.
         """
+
+        for lc_id in lc_list:
+            if lc_id not in self.return_lightcurve.keys():
+                self.return_lightcurve[lc_id] = LightCurve(self.dbConn)
+                self.return_lightcurve[lc_id].build_lightcurve_from_db(lc_id)
+
+    def measure_depth_curve(self):
+        """
+        Find the 5-sigma limiting depth in each visit.
+        """
+
+        visit_data = self.dbConn.get_all_visit_info()
+        stars = self.get_stars()
+        visit_flux_err = []
+        for star in stars:
+            star_data = self.dbConn.all_fs_visits_from_id(star['object_id'])
+            visit_flux_err.append(star_data['psf_flux_err'])
+        visit_flux_err = np.array(visit_flux_err).T
+        visit_depths = np.median(visit_flux_err, axis=1)
+        visit_depths = 22.5 - 2.5*np.log10(5*visit_depths)
+
+        depth_curve = {}
+        depth_curve['bandpass'] = [str('lsst' + x) for x in visit_data['filter']]
+        timestamp = Time(visit_data['obs_start'], scale='utc')
+        depth_curve['mjd'] = timestamp.mjd
+        depth_curve['obsHistId'] = visit_data['visit_id']
+        depth_curve['mag'] = visit_depths
+        depth_curve['mag_error'] = np.zeros(self.num_visits)
+
+        dc = LightCurve(self.dbConn)
+        dc.lightcurve = Table(data=depth_curve)
+
+        return dc
+
+    def get_depth(self, ccd_visit_id, star_ids):
+        """
+        Get the 5-sigma limiting depth for a single visit.
+        """
+
+        #visit_data = self.dbConn.
+
         return
+
+    def get_stars(self, fainter_than=None):
+        """
+        Get the stars from the pserv database for a visit.
+
+        Can return only stars fainter than a given magnitude.
+        """
+        best_visit = self.get_best_seeing_visit()
+        visit_data = self.dbConn.get_all_objects_in_visit(best_visit['ccd_visit_id'])
+
+        if fainter_than is not None:
+            max_flux = np.power(10, (fainter_than - 22.5)/-2.5)
+            visit_data = visit_data[np.where(visit_data['psf_flux'] < max_flux)]
+
+        median_val = np.median(visit_data['psf_flux'])
+        std_val = np.std(visit_data['psf_flux'])
+        max_cut = median_val + (3. * std_val)
+        min_cut = median_val - (3. * std_val)
+        keep_objects = visit_data[np.where((visit_data['psf_flux'] < max_cut)
+                                         & (visit_data['psf_flux'] > min_cut))]
+        np.random.seed(42)
+        test_objects = np.random.choice(keep_objects, size=100, replace=False)
+        ### Prune those that do not have values in all visits
+        full_visits = []
+        for star_num in range(len(test_objects)):
+            star_visits = self.dbConn.forcedSourceFromId(test_objects[star_num]['object_id'])
+            if len(star_visits) == self.num_visits:
+                full_visits.append(star_num)
+        test_objects = test_objects[full_visits]
+
+        return test_objects
+
+    def get_best_seeing_visit(self):
+        """
+        Get the i-band visit with the best seeing in arcseconds.
+        """
+
+        visit_data = self.dbConn.get_all_visit_info()
+        i_visits = visit_data[np.where(visit_data['filter']=='i')]
+        best_i_visit = i_visits[np.argmin(i_visits['seeing'])]
+
+        return best_i_visit
+
 
 
 
@@ -50,6 +139,7 @@ class LightCurve(object):
                  filter_list=['u', 'g', 'r', 'i', 'z', 'y']):
 
         self.dbConn_lc = dbConn
+        self.filter_list = filter_list
 
         for filter_name in filter_list:
             bandpass_file = os.path.join(str(getPackageDir('throughputs') +
@@ -150,19 +240,63 @@ class LightCurve(object):
         lightcurve['dec'] = [obj_info['dec'][0]]*num_results
         lightcurve['flux'] = fs_info['psf_flux']
         lightcurve['flux_error'] = fs_info['psf_flux_err']
+        lightcurve['mag'] = 22.5 - 2.5*np.log10(fs_info['psf_flux'])
+        lightcurve['mag_error'] = 2.5*np.log10(1 + (fs_info['psf_flux_err']/fs_info['psf_flux']))
         lightcurve['zp'] = [25.0]*num_results #TEMP
         lightcurve['zpsys'] = ['ab']*num_results #TEMP
 
         self.lightcurve = Table(data=lightcurve)
 
-    def visualize_lightcurve(self):
+    def visualize_lightcurve(self, using='flux', include_errors=True,
+                             use_existing_fig = None):
         """
         Make a simple light curve plot.
+
+        Adapted from sncosmo.plot_lc source code.
         """
         if self.lightcurve is None:
             raise ValueError('No lightcurve yet. Use build_lightcurve first.')
 
-        fig = sncosmo.plot_lc(self.lightcurve)
+        #if using == 'flux':
+            #fig = plt.figure()#sncosmo.plot_lc(self.lightcurve)
+        n_subplot = len(self.filter_list)
+        n_col = 2
+        n_row = (n_subplot - 1) // n_col + 1
+        if use_existing_fig is None:
+            fig = plt.figure(figsize = (4. * n_col, 3. * n_row))
+        else:
+            fig = use_existing_fig
+
+        color = ['b', 'g', 'y', 'orange', 'r', 'k']
+
+        plot_num = 1
+        for filt in self.filter_list:
+            fig.add_subplot(n_row, n_col, plot_num)
+            filt_name = str('lsst' + filt)
+            plt.title(filt_name)
+            filt_mjd = self.lightcurve['mjd'][np.where(self.lightcurve['bandpass']==filt_name)]
+            using_mjd = self.lightcurve[using][np.where(self.lightcurve['bandpass']==filt_name)]
+            if include_errors is True:
+                using_error_mjd = self.lightcurve[str(using+'_error')][np.where(self.lightcurve['bandpass']==filt_name)]
+                plt.errorbar(filt_mjd, using_mjd, yerr=using_error_mjd,
+                         ls='None', marker='.', ms=3, c=color[plot_num-1])
+            else:
+                plt.scatter(filt_mjd, using_mjd, c='r', marker='+')#,
+                            #ls='None', marker='.', ms=3, c=color[plot_num-1])
+            plt.locator_params(axis='x',nbins=5)
+            plt.xlabel('mjd')
+            if using == 'flux':
+                plt.ylabel(str(using + ' (nmgy)'))
+                plt.ylim(-10, np.max(using_mjd)+10)
+            elif using == 'mag':
+                plt.ylabel(using)
+                if use_existing_fig is not None:
+                    plt.gca().invert_yaxis()
+            plot_num += 1
+        plt.tight_layout()
+        #elif using == 'mag':
+        #    fig = plt.figure()
+
 
         return fig
 
