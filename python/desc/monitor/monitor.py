@@ -78,9 +78,17 @@ class Monitor(object):
         """
 
         visit_data = self.dbConn.get_all_visit_info()
+        seeing_info = {}
+        seeing_info['bandpass'] = [str('lsst' + x) for x in visit_data['filter']]
+        timestamp = Time(visit_data['obs_start'], scale='utc')
+        seeing_info['mjd'] = timestamp.mjd
+        seeing_info['obsHistId'] = visit_data['visit_id']
+        seeing_info['seeing'] = visit_data['seeing']
 
-        sc = SeeingCurve.build
+        sc = SeeingCurve(self.dbConn)
+        sc.build_seeing_curve(seeing_info)
 
+        return sc
 
     def get_stars(self, fainter_than=None):
         """
@@ -292,7 +300,7 @@ class LightCurve(BaseCurve):
             else:
                 plt.scatter(filt_mjd, using_mjd, c='purple', marker='+')
             plt.locator_params(axis='x',nbins=5)
-            plt.xlabel('mjd')
+            plt.xlabel('MJD')
             if using == 'flux':
                 plt.ylabel(str(using + ' (nmgy)'))
                 plt.ylim(-10, np.max(using_mjd)+10)
@@ -312,8 +320,47 @@ class SeeingCurve(BaseCurve):
     An object to store the seeing information from all visits in the survey.
     """
 
-    def visualize_seeing_curve():
+    def build_seeing_curve(self, sc_dict):
+        """
+        A wrapper around pd.read_dict to build a lightcurve from a dict.
+        """
 
+        self.seeing_curve = pd.DataFrame.from_dict(sc_dict)
 
+    def visualize_seeing_curve(self):
 
-        return
+        if self.seeing_curve is None:
+            raise ValueError('No lightcurve yet. Use build_lightcurve first.')
+
+        n_subplot = len(self.filter_list)*2
+        n_col = 2
+        n_row = len(self.filter_list)
+        fig = plt.figure(figsize = (4. * n_col, 3. * n_row))
+
+        color = ['b', 'g', 'y', 'orange', 'r', 'k']
+
+        plot_num = 1
+        for filt in self.filter_list:
+
+            fig.add_subplot(n_row, n_col, plot_num)
+            filt_name = str('lsst' + filt)
+            plt.title(filt_name)
+
+            filt_seeing = self.seeing_curve['seeing'][self.seeing_curve['bandpass'] == filt_name]
+            filt_mjd = self.seeing_curve['mjd'][self.seeing_curve['bandpass'] == filt_name]
+            plt.scatter(filt_mjd, filt_seeing,
+                        c = color[(plot_num - 1)//2], marker = '+')
+            plt.locator_params(axis='x',nbins=5)
+            plt.ylabel('Seeing (arcseconds)')
+            plt.xlabel('MJD')
+            plot_num += 1
+
+            fig.add_subplot(n_row, n_col, plot_num)
+            plt.title(filt_name)
+            plt.hist(filt_seeing, color=color[(plot_num - 1)//2])
+            plt.xlabel('Seeing (arcseconds)')
+            plot_num += 1
+
+        fig.tight_layout()
+
+        return fig
