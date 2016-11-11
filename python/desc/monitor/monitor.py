@@ -22,7 +22,7 @@ from astropy.table import Table
 from lsst.utils import getPackageDir
 plt.style.use('ggplot')
 
-__all__ = ['Monitor', 'LightCurve']
+__all__ = ['Monitor', 'LightCurve', 'SeeingCurve']
 # ==============================================================================
 
 class Monitor(object):
