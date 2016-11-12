@@ -9,6 +9,8 @@ from lsst.sims.catUtils.utils import ObservationMetaDataGenerator
 from lsst.sims.catUtils.exampleCatalogDefinitions import (DefaultPhoSimHeaderMap,
                                                          PhoSimCatalogPoint)
 from lsst.sims.photUtils import BandpassDict, SedList
+from lsst.sims.photUtils.SignalToNoise import calcSNR_m5
+from lsst.sims.photUtils.PhotometricParameters import PhotometricParameters
 
 __all__ = ["StarCacheDBObj", "TrueStars"]
 
@@ -48,52 +50,91 @@ class TrueStars(object):
 
     def get_true_stars(self, for_obsHistIds=None):
 
+        """
+        Get all the fluxes for stars in all visits in Twinkles.
+
+        Can specify a subset of visits with for_obsHistIds.
+        """
+
         if for_obsHistIds is None:
-            raise TypeError("Please specify a visit using 'for_visit='.")
+            survey_info = np.genfromtxt('../data/selectedVisits.csv',
+                                    names=True, delimiter=',')
+            for_obsHistIds = survey_info['obsHistID']
 
         obs_metadata_list = []
+        visit_on = 0
         for obsHistID in for_obsHistIds:
+            if visit_on % 100 == 0:
+                print("Generated %i out of %i obs_metadata" %
+                      (visit_on+1, len(for_obsHistIds)))
+            visit_on += 1
             obs_metadata_list.append(self.obs_gen.getObservationMetaData(
                                                     obsHistID=obsHistID,
                                                     fieldRA=(53, 54),
                                                     fieldDec=(-29, -27),
                                                     boundLength=0.3)[0])
 
-        star_df = pd.DataFrame(columns = ['uniqueId', 'filter',
-                                          'true_flux', 'obsHistId'])
+        star_df = pd.DataFrame(columns = ['uniqueId', 'ra', 'dec', 'filter',
+                                          'true_flux', 'true_flux_error',
+                                          'obsHistId'])
         bp_dict = BandpassDict.loadTotalBandpassesFromFiles()
         bp_indices = {}
         for bp in list(enumerate(bp_dict.keys())):
             bp_indices[bp[1]] = bp[0]
 
         column_names = None
-        self.obs_md = obs_metadata_list[0]
+        seds_loaded = False
 
+        visit_on = 0
         for obs_metadata in obs_metadata_list:
+            if visit_on % 100 == 0:
+                print("Generated fluxes for %i out of %i visits" %
+                      (visit_on+1, len(for_obsHistIds)))
+            visit_on += 1
             star_cat = PhoSimCatalogPoint(self.dbConn, obs_metadata=obs_metadata)
             if column_names is None:
                 column_names = [x for x in star_cat.iter_column_names()]
             star_cat.phoSimHeaderMap = DefaultPhoSimHeaderMap
             self.star_cat = star_cat
             chunk_data = []
-            i = 0
             for line in self.star_cat.iter_catalog():
                 chunk_data.append(line)
             chunk_data = pd.DataFrame(chunk_data, columns=column_names)
 
-            sed_list = SedList(chunk_data['sedFilepath'],
-                               chunk_data['phoSimMagNorm'],
-                               specMap = None,
-                               galacticAvList=chunk_data['galacticAv'])
-            mag_list = bp_dict.fluxListForSedList(sed_list,
-                          indices=[bp_indices[obs_metadata.OpsimMetaData['filter']]])
-            mag_list = np.array(mag_list)[:,bp_indices[obs_metadata.OpsimMetaData['filter']]]
+            #All SEDs will be the same since we are looking at the same point
+            #in the sky and mag_norms will be the same for stars.
+            if seds_loaded is False:
+                sed_list = SedList(chunk_data['sedFilepath'],
+                                   chunk_data['phoSimMagNorm'],
+                                   specMap = None,
+                                   galacticAvList=chunk_data['galacticAv'])
+                seds_loaded = True
+
+                flux_array = bp_dict.fluxArrayForSedList(sed_list)
+                mag_array = bp_dict.magArrayForSedList(sed_list)
+                phot_params = PhotometricParameters()
+
+            visit_filter = obs_metadata.OpsimMetaData['filter']
+            snr, gamma = calcSNR_m5(mag_array[visit_filter],
+                                    bp_dict[visit_filter],
+                                    obs_metadata.OpsimMetaData['fiveSigmaDepth'],
+                                    phot_params)
+            flux_error = flux_array[visit_filter]/snr
+
             visit_df = pd.DataFrame(np.array([chunk_data['uniqueId'],
-                                    [obs_metadata.OpsimMetaData['filter']]*len(chunk_data),
-                                    mag_list,
+                                    chunk_data['raPhoSim'],
+                                    chunk_data['decPhoSim'],
+                                    [visit_filter]*len(chunk_data),
+                                    flux_array[visit_filter], flux_error,
                                     [obs_metadata.OpsimMetaData['obsHistID']]*len(chunk_data)]).T,
-                                    columns = ['uniqueId', 'filter',
-                                               'true_flux', 'obsHistId'])
+                                    columns = ['uniqueId', 'ra', 'dec',
+                                               'filter', 'true_flux',
+                                               'true_flux_error', 'obsHistId'])
             star_df = star_df.append(visit_df, ignore_index=True)
 
         self.star_df = star_df
+
+    def write_to_db(self, filename, table_name='stars'):
+
+        disk_engine = create_engine('sqlite:///%s' % filename)
+        worker.star_df.to_sql('stars', disk_engine)
