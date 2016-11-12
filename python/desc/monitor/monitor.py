@@ -20,6 +20,7 @@ from astropy.time import Time
 from astropy.io import fits
 from astropy.table import Table
 from lsst.utils import getPackageDir
+from astroML.crossmatch import crossmatch_angular
 plt.style.use('ggplot')
 
 __all__ = ['Monitor', 'LightCurve', 'SeeingCurve']
@@ -143,8 +144,52 @@ class Monitor(object):
         best_i_visit = i_visits[np.argmin(i_visits['seeing'])]
         self.best_seeing = best_i_visit
 
+    def match_catalogs(self, truth_data, obs_data, radius=1./3600.):
 
+        """
+        Match the ids from the truth catalog and the data catalog by
+        ra,dec positions.
+        """
 
+        true_pos = truth_data[['ra', 'dec']]
+        obs_pos = obs_data[['ra', 'dec']]
+
+        true_ra_dec = np.empty((len(true_pos), 2), dtype=np.float64)
+        obs_ra_dec = np.empty((len(obs_pos), 2), dtype=np.float64)
+
+        true_ra_dec[:,0] = true_pos['ra']
+        true_ra_dec[:,1] = true_pos['dec']
+        obs_ra_dec[:,0] = obs_pos['ra']
+        obs_ra_dec[:,1] = obs_pos['dec']
+
+        dist, ind = crossmatch_angular(obs_ra_dec, true_ra_dec, radius)
+
+        return dist, ind
+
+    def calc_flux_diff(self, for_visits=None):
+        """
+        Get the truth data and the observed data then subtract the fluxes
+        to get the differences.
+        """
+
+        all_visits = self.dbConn.get_all_visit_info()
+        if for_visits is not None:
+            ccd_visit_list = []
+            for visit_num in for_visits:
+                ccd_visit = all_visits[np.where(all_visits['visit_id'] ==
+                                                    visit_num)]['ccd_visit_id']
+                ccd_visit_list.append(ccd_visit[0])
+            visit_list = for_visits
+        else:
+            ccd_visit_list = all_visits['ccd_visit_id']
+            visit_list = all_visits['visit_id']
+
+        for visit, ccd_visit in zip(visit_list, ccd_visit_list):
+            obs_objects = self.dbConn.get_all_objects_in_visit(ccd_visit)
+            true_stars = self.truth_dbConn.get_stars_by_visit(visit)
+            match = self.match_catalogs(true_stars, obs_objects)
+
+        return match
 
 # =============================================================================
 
