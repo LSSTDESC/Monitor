@@ -29,10 +29,12 @@ class Monitor(object):
     '''
     Simple class for extracting DM forced photometry light curves.
     '''
-    def __init__(self, dbConn):
+    def __init__(self, dbConn, truth_dbConn=None):
         self.dbConn = dbConn
+        self.truth_dbConn = truth_dbConn
         self.return_lightcurve = {}
         self.num_visits = self.dbConn.get_number_of_visits()
+        self.best_seeing = None
         return
 
     def get_lightcurves(self, lc_list):
@@ -49,12 +51,20 @@ class Monitor(object):
         """
         Find the 5-sigma limiting depth in each visit.
         """
+
+        if self.best_seeing is None:
+            self.get_best_seeing_visit()
+
         visit_data = self.dbConn.get_all_visit_info()
-        stars = self.get_stars()
+        stars = self.get_stars(in_visit=self.best_seeing['ccd_visit_id'],
+                               with_sigma_clipping=True)
         visit_flux_err = []
+
         for star in stars:
             star_data = self.dbConn.all_fs_visits_from_id(star['object_id'])
+            self.star_data = star_data
             visit_flux_err.append(star_data['psf_flux_err'])
+
         visit_flux_err = np.array(visit_flux_err).T
         visit_depths = np.median(visit_flux_err, axis=1)
         visit_depths = 22.5 - 2.5*np.log10(5*visit_depths)
@@ -90,34 +100,36 @@ class Monitor(object):
 
         return sc
 
-    def get_stars(self, fainter_than=None):
+    def get_stars(self, in_visit=None, fainter_than=None, with_sigma_clipping=False):
         """
         Get the stars from the pserv database for a visit.
 
         Can return only stars fainter than a given magnitude.
         """
-        best_visit = self.get_best_seeing_visit()
-        visit_data = self.dbConn.get_all_objects_in_visit(best_visit['ccd_visit_id'])
+        visit_data = self.dbConn.get_all_objects_in_visit(in_visit)
 
         if fainter_than is not None:
             max_flux = np.power(10, (fainter_than - 22.5)/-2.5)
             visit_data = visit_data[np.where(visit_data['psf_flux'] < max_flux)]
 
-        median_val = np.median(visit_data['psf_flux'])
-        std_val = np.std(visit_data['psf_flux'])
-        max_cut = median_val + (3. * std_val)
-        min_cut = median_val - (3. * std_val)
-        keep_objects = visit_data[np.where((visit_data['psf_flux'] < max_cut)
-                                         & (visit_data['psf_flux'] > min_cut))]
-        np.random.seed(42)
-        test_objects = np.random.choice(keep_objects, size=100, replace=False)
-        ### Prune those that do not have values in all visits
-        full_visits = []
-        for star_num in range(len(test_objects)):
-            star_visits = self.dbConn.forcedSourceFromId(test_objects[star_num]['object_id'])
-            if len(star_visits) == self.num_visits:
-                full_visits.append(star_num)
-        test_objects = test_objects[full_visits]
+        if with_sigma_clipping is True:
+            median_val = np.median(visit_data['psf_flux'])
+            std_val = np.std(visit_data['psf_flux'])
+            max_cut = median_val + (3. * std_val)
+            min_cut = median_val - (3. * std_val)
+            keep_objects = visit_data[np.where((visit_data['psf_flux'] < max_cut)
+                                             & (visit_data['psf_flux'] > min_cut))]
+            np.random.seed(42)
+            test_objects = np.random.choice(keep_objects, size=100, replace=False)
+            ### Prune those that do not have values in all visits
+            full_visits = []
+            for star_num in range(len(test_objects)):
+                star_visits = self.dbConn.forcedSourceFromId(test_objects[star_num]['object_id'])
+                if len(star_visits) == self.num_visits:
+                    full_visits.append(star_num)
+            test_objects = test_objects[full_visits]
+        else:
+            test_objects = visit_data
 
         return test_objects
 
@@ -129,8 +141,7 @@ class Monitor(object):
         visit_data = self.dbConn.get_all_visit_info()
         i_visits = visit_data[np.where(visit_data['filter']=='i')]
         best_i_visit = i_visits[np.argmin(i_visits['seeing'])]
-
-        return best_i_visit
+        self.best_seeing = best_i_visit
 
 
 

@@ -2,7 +2,7 @@ from __future__ import absolute_import
 import numpy as np
 from lsst.sims.catalogs.db import DBObject
 
-__all__ = ['dbInterface']
+__all__ = ['dbInterface', 'truthDBInterface']
 
 class dbInterface(object):
 
@@ -59,7 +59,9 @@ class dbInterface(object):
                 inner join CcdVisit on
                        ForcedSource.ccdVisitId = CcdVisit.ccdVisitId
                        and ForcedSource.objectId = %i
-                       and ForcedSource.project = '%s'""" % (objectId,
+                       and ForcedSource.project = '%s'
+                       and CcdVisit.project = '%s'""" % (objectId,
+                                                           self.project,
                                                            self.project)
         results = self._dbo.execute_arbitrary(query, dtype=dtype)
         return results
@@ -131,3 +133,17 @@ class dbInterface(object):
         results = self._dbo.execute_arbitrary(query, dtype=dtype)
 
         return results['count'][0]
+
+class truthDBInterface(object):
+
+    def __init__(self, database, host=None, port=None, driver='sqlite'):
+
+        self._dbo = DBObject(database=database, host=host, port=port,
+                             driver=driver)
+
+    def get_stars_by_visit(self):
+
+        dtype = np.dtype([('object_id', np.int),
+                          ('psf_flux', np.float),
+                          ('psf_flux_err', np.float),
+                          ('flags', np.int)])
