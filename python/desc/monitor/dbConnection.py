@@ -111,13 +111,24 @@ class dbInterface(object):
     def get_all_objects_in_visit(self, ccd_visit_id):
 
         dtype = np.dtype([('object_id', np.int),
+                          ('ra', np.float),
+                          ('dec', np.float),
                           ('psf_flux', np.float),
                           ('psf_flux_err', np.float),
                           ('flags', np.int)])
-        query = """select objectId, psFlux, psFlux_Sigma, flags
+        query = """select ForcedSource.objectId,
+                          Object.psRa, Object.psDecl,
+                          ForcedSource.psFlux,
+                          ForcedSource.psFlux_Sigma,
+                          ForcedSource.flags
                    from ForcedSource
-                   where ccdVisitId = %i
-                   and project = '%s'""" % (ccd_visit_id, self.project)
+                   inner join Object on
+                          ForcedSource.objectId = Object.objectId
+                          and ForcedSource.ccdVisitId = %i
+                          and ForcedSource.project = '%s'
+                          and Object.project = '%s'""" % (ccd_visit_id,
+                                                          self.project,
+                                                          self.project)
         results = self._dbo.execute_arbitrary(query, dtype=dtype)
 
         return results
@@ -141,9 +152,17 @@ class truthDBInterface(object):
         self._dbo = DBObject(database=database, host=host, port=port,
                              driver=driver)
 
-    def get_stars_by_visit(self):
+    def get_stars_by_visit(self, visit_num):
 
         dtype = np.dtype([('object_id', np.int),
-                          ('psf_flux', np.float),
-                          ('psf_flux_err', np.float),
-                          ('flags', np.int)])
+                          ('ra', np.float),
+                          ('dec', np.float),
+                          ('true_flux', np.float),
+                          ('true_flux_error', np.float)])
+        query = """SELECT unique_id, ra, dec, true_flux, true_flux_error
+                   FROM stars
+                   WHERE obsHistId = %i""" % (visit_num)
+
+        results = self._dbo.execute_arbitrary(query, dtype=dtype)
+
+        return results
