@@ -7,4 +7,3 @@ from .Display import *
 from .dbConnection import *
 from .CreateTruthDB import *
 from .TruthCatalogDefs import *
-from .ErrorModel import *
