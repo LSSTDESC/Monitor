@@ -16,6 +16,7 @@ import numpy as np
 import sncosmo
 import astropy.units as u
 import matplotlib.pyplot as plt
+import warnings
 from astropy.time import Time
 from astropy.io import fits
 from astropy.table import Table
@@ -178,14 +179,22 @@ class Monitor(object):
         dc = with_depth_curve.lightcurve
         sc = with_seeing_curve.seeing_curve
 
+        warnings.simplefilter('always', UserWarning)
+
         all_visits = self.dbConn.get_all_visit_info()
         if for_visits is not None:
             ccd_visit_list = []
+            visit_list = []
             for visit_num in for_visits:
                 ccd_visit = all_visits[np.where(all_visits['visit_id'] ==
                                                     visit_num)]['ccd_visit_id']
-                ccd_visit_list.append(ccd_visit[0])
-            visit_list = for_visits
+                if len(ccd_visit) < 1:
+                    warnings.warn("You have specified a visit that does" +
+                                      " not exist in your project data.  " +
+                                      "Skipping over visit %i." % visit_num)
+                else:
+                    ccd_visit_list.append(ccd_visit[0])
+                    visit_list.append(visit_num)
         else:
             ccd_visit_list = all_visits['ccd_visit_id']
             visit_list = all_visits['visit_id']
@@ -193,6 +202,9 @@ class Monitor(object):
         flux_statistics = []
 
         for visit, ccd_visit in zip(visit_list, ccd_visit_list):
+            if len(flux_statistics) % 10 == 0.:
+                print('Calculated Residuals for %i visits out of %i' %
+                      (len(flux_statistics), len(visit_list)))
             obs_objects = self.dbConn.get_all_objects_in_visit(ccd_visit)
             true_stars = self.truth_dbConn.get_stars_by_visit(visit)
             dist, ind = self.match_catalogs(true_stars, obs_objects)
@@ -208,8 +220,7 @@ class Monitor(object):
                     flux_diffs.append(obs_objects['psf_flux'][keep] -
                                       true_stars['true_flux'][idx])
             f_clip, f_low, f_high = sigmaclip(flux_diffs)
-            fs_clip, fs_low, fs_high = sigmaclip((np.array(flux_diffs)**2.))
-            flux_statistics.append([np.mean(f_clip), np.mean(fs_clip),
+            flux_statistics.append([np.mean(f_clip), np.mean(f_clip**2.),
                                     dc['mag'][np.where(dc['obsHistId']==visit)[0][0]],
                                     sc['seeing'][np.where(sc['obsHistId']==visit)[0][0]]])
 
@@ -220,22 +231,100 @@ class Monitor(object):
 
 #        return np.array(match_flux), np.array(flux_diffs)
 
-    def plot_bias(self):
+    def set_stats_plot_limits(self, num_bins=[20., 20.]):
+        """
+        Set limits for plots of bias and sigma.
+        """
+
+        if num_bins is not list:
+            n_bins = [num_bins, num_bins]
+
+        p_lims = {}
+        p_lims['max_d'] = np.max(self.flux_stats['depth'])
+        p_lims['min_d'] = np.min(self.flux_stats['depth'])
+        p_lims['max_s'] = np.max(self.flux_stats['seeing'])
+        p_lims['min_s'] = np.min(self.flux_stats['seeing'])
+
+        return p_lims, n_bins
+
+    def plot_bias(self, with_bins=20.):
         """
         Plot the mean residuals of each visit as a function of depth and
         seeing.
         """
 
+        p_lims, num_bins = self.set_stats_plot_limits(num_bins=with_bins)
 
-        return
+        d_grid, s_grid = np.meshgrid(np.linspace(p_lims['min_d']-.01,
+                                                 p_lims['max_d']+.01,
+                                                 num=num_bins[0]+1),
+                                     np.linspace(p_lims['min_s']-.01,
+                                                 p_lims['max_s']+.01,
+                                                 num=num_bins[1]+1))
+        p_lims['delta_d'] = d_grid[0,1] - d_grid[0,0]
+        p_lims['delta_s'] = s_grid[1,0] - s_grid[0,0]
+        p_val = np.zeros(np.shape(d_grid))
+        for i in range(np.shape(d_grid)[0]):
+            for j in range(np.shape(s_grid)[0]):
+                depth_grid_vals = self.flux_stats[((self.flux_stats['depth'] >= d_grid[i,j]) &
+                                                   (self.flux_stats['depth'] < (d_grid[i,j] +
+                                                                                p_lims['delta_d'])))]
+                grid_vals = depth_grid_vals[((depth_grid_vals['seeing'] >= s_grid[i,j]) &
+                                            (depth_grid_vals['seeing'] < (s_grid[i,j] +
+                                                                          p_lims['delta_s'])))]
 
-    def plot_sigma(self):
+                if len(grid_vals) > 0:
+                    p_val[i,j] = np.mean(grid_vals['mean_resid'])
+
+        fig = plt.figure()
+        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm)
+        plt.colorbar()
+        plt.xlim(p_lims['min_d'], p_lims['max_d'])
+        plt.ylim(p_lims['min_s'], p_lims['max_s'])
+        plt.title('Bias in Fluxes')
+        plt.xlabel('5-sigma Depth (mags)')
+        plt.ylabel('Observed Seeing (arcsec)')
+
+        return fig
+
+    def plot_sigma(self, with_bins=20.):
         """
         Plot the mean of the squared residuals of each visit as a function
         of depth and seeing.
         """
+        p_lims, num_bins = self.set_stats_plot_limits(num_bins=with_bins)
 
-        return
+        d_grid, s_grid = np.meshgrid(np.linspace(p_lims['min_d']-.01,
+                                                 p_lims['max_d']+.01,
+                                                 num=num_bins[0]+1),
+                                     np.linspace(p_lims['min_s']-.01,
+                                                 p_lims['max_s']+.01,
+                                                 num=num_bins[1]+1))
+        p_lims['delta_d'] = d_grid[0,1] - d_grid[0,0]
+        p_lims['delta_s'] = s_grid[1,0] - s_grid[0,0]
+        p_val = np.zeros(np.shape(d_grid))
+        for i in range(np.shape(d_grid)[0]):
+            for j in range(np.shape(s_grid)[0]):
+                depth_grid_vals = self.flux_stats[((self.flux_stats['depth'] >= d_grid[i,j]) &
+                                                   (self.flux_stats['depth'] < (d_grid[i,j] +
+                                                                                p_lims['delta_d'])))]
+                grid_vals = depth_grid_vals[((depth_grid_vals['seeing'] >= s_grid[i,j]) &
+                                            (depth_grid_vals['seeing'] < (s_grid[i,j] +
+                                                                          p_lims['delta_s'])))]
+
+                if len(grid_vals) > 0:
+                    p_val[i,j] = np.mean(grid_vals['mean_sq_resid'])
+
+        fig = plt.figure()
+        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm)
+        plt.colorbar()
+        plt.xlim(p_lims['min_d'], p_lims['max_d'])
+        plt.ylim(p_lims['min_s'], p_lims['max_s'])
+        plt.title('Flux Variance')
+        plt.xlabel('5-sigma Depth (mags)')
+        plt.ylabel('Observed Seeing (arcsec)')
+
+        return fig
 
 # =============================================================================
 
