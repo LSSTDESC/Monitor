@@ -6,11 +6,11 @@ from sqlalchemy import create_engine
 from lsst.utils import getPackageDir
 from lsst.sims.catalogs.db import CatalogDBObject
 from lsst.sims.catUtils.utils import ObservationMetaDataGenerator
-from lsst.sims.catUtils.exampleCatalogDefinitions import (DefaultPhoSimHeaderMap,
-                                                         PhoSimCatalogPoint)
+from lsst.sims.catUtils.exampleCatalogDefinitions import DefaultPhoSimHeaderMap
 from lsst.sims.photUtils import BandpassDict, SedList
 from lsst.sims.photUtils.SignalToNoise import calcSNR_m5
 from lsst.sims.photUtils.PhotometricParameters import PhotometricParameters
+from desc.monitor.TruthCatalogDefs import TruthCatalogPoint
 
 __all__ = ["StarCacheDBObj", "TrueStars"]
 
@@ -91,13 +91,14 @@ class TrueStars(object):
                 print("Generated fluxes for %i out of %i visits" %
                       (visit_on+1, len(for_obsHistIds)))
             visit_on += 1
-            star_cat = PhoSimCatalogPoint(self.dbConn, obs_metadata=obs_metadata)
+            star_cat = TruthCatalogPoint(self.dbConn, obs_metadata=obs_metadata,
+                                         constraint='gmag > 11')
+
             if column_names is None:
                 column_names = [x for x in star_cat.iter_column_names()]
             star_cat.phoSimHeaderMap = DefaultPhoSimHeaderMap
-            self.star_cat = star_cat
             chunk_data = []
-            for line in self.star_cat.iter_catalog():
+            for line in star_cat.iter_catalog():
                 chunk_data.append(line)
             chunk_data = pd.DataFrame(chunk_data, columns=column_names)
 
@@ -110,26 +111,26 @@ class TrueStars(object):
                                    galacticAvList=chunk_data['galacticAv'])
                 seds_loaded = True
 
-                flux_array = bp_dict.fluxArrayForSedList(sed_list)
                 mag_array = bp_dict.magArrayForSedList(sed_list)
                 phot_params = PhotometricParameters()
 
             visit_filter = obs_metadata.OpsimMetaData['filter']
+            flux_array = np.power(10,-0.4*(mag_array[visit_filter] - 22.5))
             snr, gamma = calcSNR_m5(mag_array[visit_filter],
                                     bp_dict[visit_filter],
                                     obs_metadata.OpsimMetaData['fiveSigmaDepth'],
                                     phot_params)
-            flux_error = flux_array[visit_filter]/snr
+            flux_error = flux_array/snr
 
             visit_df = pd.DataFrame(np.array([chunk_data['uniqueId'],
-                                    chunk_data['raPhoSim'],
-                                    chunk_data['decPhoSim'],
+                                    chunk_data['raJ2000'],
+                                    chunk_data['decJ2000'],
                                     [visit_filter]*len(chunk_data),
-                                    flux_array[visit_filter], flux_error,
+                                    flux_array, flux_error,
                                     [obs_metadata.OpsimMetaData['obsHistID']]*len(chunk_data)]).T,
-                                    columns = ['uniqueId', 'ra', 'dec',
-                                               'filter', 'true_flux',
-                                               'true_flux_error', 'obsHistId'])
+                                    columns = ['uniqueId', 'ra', 'dec', 'filter',
+                                               'true_flux', 'true_flux_error',
+                                               'obsHistId'])
             star_df = star_df.append(visit_df, ignore_index=True)
 
         self.star_df = star_df
