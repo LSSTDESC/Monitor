@@ -21,6 +21,7 @@ from astropy.io import fits
 from astropy.table import Table
 from lsst.utils import getPackageDir
 from astroML.crossmatch import crossmatch_angular
+from scipy.stats import sigmaclip
 plt.style.use('ggplot')
 
 __all__ = ['Monitor', 'LightCurve', 'SeeingCurve']
@@ -35,6 +36,7 @@ class Monitor(object):
         self.truth_dbConn = truth_dbConn
         self.return_lightcurve = {}
         self.num_visits = self.dbConn.get_number_of_visits()
+
         self.best_seeing = None
         return
 
@@ -166,11 +168,15 @@ class Monitor(object):
 
         return dist, ind
 
-    def calc_flux_diff(self, for_visits=None):
+    def calc_flux_residuals(self, for_visits=None, with_depth_curve=None,
+                            with_seeing_curve=None):
         """
         Get the truth data and the observed data then subtract the fluxes
         to get the differences.
         """
+
+        dc = with_depth_curve.lightcurve
+        sc = with_seeing_curve.seeing_curve
 
         all_visits = self.dbConn.get_all_visit_info()
         if for_visits is not None:
@@ -184,12 +190,52 @@ class Monitor(object):
             ccd_visit_list = all_visits['ccd_visit_id']
             visit_list = all_visits['visit_id']
 
+        flux_statistics = []
+
         for visit, ccd_visit in zip(visit_list, ccd_visit_list):
             obs_objects = self.dbConn.get_all_objects_in_visit(ccd_visit)
             true_stars = self.truth_dbConn.get_stars_by_visit(visit)
-            match = self.match_catalogs(true_stars, obs_objects)
+            dist, ind = self.match_catalogs(true_stars, obs_objects)
+#            match_flux = []
+            flux_diffs = []
+            for idx in range(len(true_stars)):
+                matches = np.where(ind == idx)[0]
+                distances = dist[matches]
+                if len(distances) > 0:
+                    keep = matches[np.argmin(distances)]
+#                    match_flux.append([obs_objects['psf_flux'][keep],
+#                                       true_stars['true_flux'][idx]])
+                    flux_diffs.append(obs_objects['psf_flux'][keep] -
+                                      true_stars['true_flux'][idx])
+            f_clip, f_low, f_high = sigmaclip(flux_diffs)
+            fs_clip, fs_low, fs_high = sigmaclip((np.array(flux_diffs)**2.))
+            flux_statistics.append([np.mean(f_clip), np.mean(fs_clip),
+                                    dc['mag'][np.where(dc['obsHistId']==visit)[0][0]],
+                                    sc['seeing'][np.where(sc['obsHistId']==visit)[0][0]]])
 
-        return match
+        self.flux_stats = pd.DataFrame(flux_statistics,
+                                       columns=[('mean_resid'),
+                                                ('mean_sq_resid'),
+                                                ('depth'), ('seeing')])
+
+#        return np.array(match_flux), np.array(flux_diffs)
+
+    def plot_bias(self):
+        """
+        Plot the mean residuals of each visit as a function of depth and
+        seeing.
+        """
+
+
+        return
+
+    def plot_sigma(self):
+        """
+        Plot the mean of the squared residuals of each visit as a function
+        of depth and seeing.
+        """
+
+        return
 
 # =============================================================================
 
