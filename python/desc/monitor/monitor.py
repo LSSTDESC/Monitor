@@ -170,7 +170,7 @@ class Monitor(object):
         return dist, ind
 
     def calc_flux_residuals(self, for_visits=None, with_depth_curve=None,
-                            with_seeing_curve=None):
+                            with_seeing_curve=None, return_dist=False):
         """
         Get the truth data and the observed data then subtract the fluxes
         to get the differences.
@@ -181,6 +181,7 @@ class Monitor(object):
 
         warnings.simplefilter('always', UserWarning)
 
+        print('Gathering Visit Data')
         all_visits = self.dbConn.get_all_visit_info()
         if for_visits is not None:
             ccd_visit_list = []
@@ -199,15 +200,17 @@ class Monitor(object):
             ccd_visit_list = all_visits['ccd_visit_id']
             visit_list = all_visits['visit_id']
 
+        print('Matching Catalogs')
         flux_statistics = []
-
+        dist_statistics = []
         for visit, ccd_visit in zip(visit_list, ccd_visit_list):
-            if len(flux_statistics) % 10 == 0.:
+            if len(flux_statistics) % 50 == 0.:
                 print('Calculated Residuals for %i visits out of %i' %
                       (len(flux_statistics), len(visit_list)))
             obs_objects = self.dbConn.get_all_objects_in_visit(ccd_visit)
             true_stars = self.truth_dbConn.get_stars_by_visit(visit)
             dist, ind = self.match_catalogs(true_stars, obs_objects)
+
 #            match_flux = []
             flux_diffs = []
             for idx in range(len(true_stars)):
@@ -219,6 +222,7 @@ class Monitor(object):
 #                                       true_stars['true_flux'][idx]])
                     flux_diffs.append(obs_objects['psf_flux'][keep] -
                                       true_stars['true_flux'][idx])
+                    dist_statistics.append(np.min(distances))
             f_clip, f_low, f_high = sigmaclip(flux_diffs)
             flux_statistics.append([np.mean(f_clip), np.mean(f_clip**2.),
                                     dc['mag'][np.where(dc['obsHistId']==visit)[0][0]],
@@ -231,6 +235,11 @@ class Monitor(object):
                                                 ('mean_sq_resid'),
                                                 ('depth'), ('seeing'),
                                                 ('bandpass'), ('num_objects')])
+
+        if return_dist is True:
+            return dist_statistics
+        else:
+            return
 
 #        return np.array(match_flux), np.array(flux_diffs)
 
@@ -250,7 +259,7 @@ class Monitor(object):
 
         return p_lims, n_bins
 
-    def plot_bias_map(self, in_band='r', with_bins=20.):
+    def plot_bias_map(self, in_band='r', with_bins=20., use_existing_fig=None):
         """
         Plot the mean residuals of each visit as a function of depth and
         seeing.
@@ -283,37 +292,49 @@ class Monitor(object):
                     p_val[i,j] = np.average(grid_vals['mean_resid'],
                                             weights=grid_vals['num_objects'])
 
-        fig = plt.figure()
-        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm)
+        if use_existing_fig is not None:
+            fig = use_existing_fig
+        else:
+            fig = plt.figure()
+        plt.gca().set_axis_bgcolor('k')
+        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm, vmin=-0.3, vmax=0.3)
         plt.colorbar()
         plt.xlim(p_lims['min_d'], p_lims['max_d'])
         plt.ylim(p_lims['min_s'], p_lims['max_s'])
-        plt.title('Bias in Fluxes for lsst_%s filter' % in_band)
+        plt.title('Bias in Fluxes for %s filter' % in_band)
         plt.xlabel('5-sigma Depth (mags)')
         plt.ylabel('Observed Seeing (arcsec)')
 
         return fig
 
-    def plot_bias_scatter(self, in_band='r'):
+    def plot_bias_scatter(self, in_band='r', use_existing_fig=None):
 
         p_lims, num_bins = self.set_stats_plot_limits(num_bins=0)
         in_band = str('lsst'+in_band)
 
         idx = np.where(self.flux_stats['bandpass'] == in_band)[0]
 
+        if use_existing_fig is not None:
+            fig = use_existing_fig
+        else:
+            fig = plt.figure()
+
         plt.scatter(self.flux_stats['depth'][idx],
                     self.flux_stats['seeing'][idx],
                     c=(self.flux_stats['mean_resid'][idx]),
-                    cmap=plt.cm.coolwarm)
+                    cmap=plt.cm.coolwarm, vmin=-0.3, vmax=0.3)
 
         plt.colorbar()
         plt.xlim(p_lims['min_d']-.05, p_lims['max_d']+.05)
         plt.ylim(p_lims['min_s']-.01, p_lims['max_s']+.01)
-        plt.title('Bias in Fluxes for lsst_%s bandpass' % in_band)
+        plt.title('Bias in Fluxes for %s bandpass' % in_band)
         plt.xlabel('5-sigma Depth (mags)')
         plt.ylabel('Observed Seeing (arcsec)')
 
-    def plot_variance_map(self, with_bins=20., in_band='r'):
+        return fig
+
+    def plot_variance_map(self, with_bins=20., in_band='r',
+                          use_existing_fig=None):
         """
         Plot the mean of the squared residuals of each visit as a function
         of depth and seeing.
@@ -347,36 +368,47 @@ class Monitor(object):
                                  np.average(grid_vals['mean_resid'],
                                             weights=grid_vals['num_objects']))
 
-        fig = plt.figure()
-        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm)
+        if use_existing_fig is not None:
+            fig = use_existing_fig
+        else:
+            fig = plt.figure()
+
+        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.plasma, vmin=0., vmax=0.6)
         plt.colorbar()
         plt.xlim(p_lims['min_d'], p_lims['max_d'])
         plt.ylim(p_lims['min_s'], p_lims['max_s'])
-        plt.title('Flux Variance for lsst_%s bandpass' % in_band)
+        plt.title('Flux Variance for %s bandpass' % in_band)
         plt.xlabel('5-sigma Depth (mags)')
         plt.ylabel('Observed Seeing (arcsec)')
 
         return fig
 
-    def plot_variance_scatter(self, in_band='r'):
+    def plot_variance_scatter(self, in_band='r', use_existing_fig=None):
 
         p_lims, num_bins = self.set_stats_plot_limits(num_bins=0)
         in_band = str('lsst'+in_band)
 
         idx = np.where(self.flux_stats['bandpass'] == in_band)[0]
 
+        if use_existing_fig is not None:
+            fig = use_existing_fig
+        else:
+            fig = plt.figure()
+
         plt.scatter(self.flux_stats['depth'][idx],
                     self.flux_stats['seeing'][idx],
                     c=(self.flux_stats['mean_sq_resid'][idx] -
                       (self.flux_stats['mean_resid'][idx])**2),
-                    cmap=plt.cm.coolwarm)
+                    cmap=plt.cm.plasma, vmin=0, vmax=0.6)
 
         plt.colorbar()
         plt.xlim(p_lims['min_d']-.05, p_lims['max_d']+.05)
         plt.ylim(p_lims['min_s']-.01, p_lims['max_s']+.01)
-        plt.title('Flux Variance for lsst_%s bandpass' % in_band)
+        plt.title('Flux Variance for %s bandpass' % in_band)
         plt.xlabel('5-sigma Depth (mags)')
         plt.ylabel('Observed Seeing (arcsec)')
+
+        return fig
 
 # =============================================================================
 
