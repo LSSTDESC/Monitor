@@ -100,9 +100,12 @@ class dbInterface(object):
                           ('visit_id', np.int),
                           ('filter', str, 300),
                           ('obs_start', str, 300),
-                          ('seeing', np.float)])
+                          ('zero_point', np.float),
+                          ('seeing', np.float),
+                          ('sky_noise', np.float)])
 
-        query = """select ccdVisitId, visitId, filterName, obsStart, seeing
+        query = """select ccdVisitId, visitId, filterName, obsStart, zeroPoint,
+                          seeing, skyNoise
                    from CcdVisit where project = '%s'""" % self.project
         results = self._dbo.execute_arbitrary(query, dtype=dtype)
 
@@ -145,6 +148,19 @@ class dbInterface(object):
 
         return results['count'][0]
 
+    def get_object_locations(self):
+
+        dtype = np.dtype([('object_id', np.int),
+                          ('ra', np.float),
+                          ('dec', np.float)])
+        query = """select objectId, psRa, psDecl
+                   from Object
+                   where project = '%s'""" % (self.project)
+
+        results = self._dbo.execute_arbitrary(query, dtype=dtype)
+
+        return results
+
 class truthDBInterface(object):
 
     def __init__(self, database, host=None, port=None, driver='sqlite'):
@@ -162,6 +178,37 @@ class truthDBInterface(object):
         query = """SELECT unique_id, ra, dec, true_flux, true_flux_error
                    FROM stars
                    WHERE obsHistId = %i""" % (visit_num)
+
+        results = self._dbo.execute_arbitrary(query, dtype=dtype)
+
+        return results
+
+    def get_all_star_ra_dec(self):
+
+        dtype = np.dtype([('object_id', np.int),
+                          ('ra', np.float),
+                          ('dec', np.float)])
+        query = """SELECT unique_id, ra, dec
+                   FROM stars"""
+
+        results = self._dbo.execute_arbitrary(query, dtype=dtype)
+
+        return results
+
+    def get_all_info_by_object_id(self, object_id_tuple):
+
+        dtype = np.dtype([('object_id', np.int),
+                          ('ra', np.float),
+                          ('dec', np.float),
+                          ('filter', str, 300),
+                          ('true_flux', np.float),
+                          ('true_flux_error', np.float),
+                          ('obsHistId', np.int)])
+
+        query = str("""SELECT *
+                   FROM stars
+                   WHERE """ + ' or '.join(('unique_id = ' +
+                                         str(n) for n in object_id_tuple)))
 
         results = self._dbo.execute_arbitrary(query, dtype=dtype)
 
