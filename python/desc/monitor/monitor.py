@@ -39,6 +39,7 @@ class Monitor(object):
         self.num_visits = self.dbConn.get_number_of_visits()
 
         self.best_seeing = None
+        self.matched_ids = None
         return
 
     def get_lightcurves(self, lc_list):
@@ -147,12 +148,17 @@ class Monitor(object):
         best_i_visit = i_visits[np.argmin(i_visits['seeing'])]
         self.best_seeing = best_i_visit
 
-    def match_catalogs(self, truth_data, obs_data, radius=1./3600.):
+    def match_catalogs(self, within_radius=1./3600., return_distance=False):
 
         """
         Match the ids from the truth catalog and the data catalog by
         ra,dec positions.
         """
+
+        print('Querying Truth Catalog')
+        truth_data = self.truth_dbConn.get_all_star_ra_dec()
+        print('Querying Pserv Database')
+        obs_data = self.dbConn.get_object_locations()
 
         true_pos = truth_data[['ra', 'dec']]
         obs_pos = obs_data[['ra', 'dec']]
@@ -165,12 +171,39 @@ class Monitor(object):
         obs_ra_dec[:,0] = obs_pos['ra']
         obs_ra_dec[:,1] = obs_pos['dec']
 
-        dist, ind = crossmatch_angular(obs_ra_dec, true_ra_dec, radius)
+        print('Starting angular crossmatch')
+        dist, ind = crossmatch_angular(obs_ra_dec, true_ra_dec, within_radius)
+        true_obs_match_ids = []
 
-        return dist, ind
+        if return_distance is True:
+            matched_distance = []
+
+        for idx in range(len(true_ra_dec)):
+            matches = np.where(ind == idx)[0]
+            distances = dist[matches]
+            match_info = []
+            if len(distances) > 0:
+                match_info.append(truth_data['object_id'][idx])
+                keep = matches[np.argmin(distances)]
+                match_info.append(obs_data['object_id'][keep])
+                match_info.append(len(distances))
+                true_obs_match_ids.append(match_info)
+                if return_distance is True:
+                    matched_distance.append(np.min(distances))
+        print('Done')
+
+        self.matched_ids = pd.DataFrame(true_obs_match_ids,
+                                        columns = ('truth_object_id',
+                                                   'obs_object_id',
+                                                   'num_matches'))
+
+        if return_distance is True:
+            return np.array(matched_distance)
+        else:
+            return
 
     def calc_flux_residuals(self, for_visits=None, with_depth_curve=None,
-                            with_seeing_curve=None, return_dist=False):
+                            with_seeing_curve=None):
         """
         Get the truth data and the observed data then subtract the fluxes
         to get the differences.
@@ -180,6 +213,20 @@ class Monitor(object):
         sc = with_seeing_curve.seeing_curve
 
         warnings.simplefilter('always', UserWarning)
+
+        if self.matched_ids is None:
+            print('Matching Catalogs')
+            self.match_catalogs()
+
+        match_dict = dict((k,v) for (k,v) in zip(self.matched_ids['truth_object_id'],
+                                                 self.matched_ids['obs_object_id']))
+
+        truth_data = self.truth_dbConn.get_all_info_by_object_id(self.matched_ids['truth_object_id'])
+        truth_data = pd.DataFrame(truth_data)
+        id_match = []
+        for true_id in truth_data['object_id']:
+            id_match.append(match_dict[true_id])
+        truth_data['obs_object_id'] = id_match
 
         print('Gathering Visit Data')
         all_visits = self.dbConn.get_all_visit_info()
@@ -200,34 +247,47 @@ class Monitor(object):
             ccd_visit_list = all_visits['ccd_visit_id']
             visit_list = all_visits['visit_id']
 
-        print('Matching Catalogs')
-        flux_statistics = []
-        dist_statistics = []
-        for visit, ccd_visit in zip(visit_list, ccd_visit_list):
-            if len(flux_statistics) % 50 == 0.:
-                print('Calculated Residuals for %i visits out of %i' %
-                      (len(flux_statistics), len(visit_list)))
-            obs_objects = self.dbConn.get_all_objects_in_visit(ccd_visit)
-            true_stars = self.truth_dbConn.get_stars_by_visit(visit)
-            dist, ind = self.match_catalogs(true_stars, obs_objects)
+        print('Querying for object fluxes')
+        obs_flux_table = pd.DataFrame(columns = ('obs_object_id',
+                                                 'visit_id',
+                                                 'filter',
+                                                 'psf_flux',
+                                                 'psf_flux_err'))
+        obj_queried = 0
+        for obs_id in self.matched_ids['obs_object_id']:
+            if obj_queried % 100 == 0:
+                print('Loaded %i out of %i objects' % (obj_queried,
+                                                       len(self.matched_ids)))
+            obj_queried+=1
+            obj_flux = self.dbConn.all_fs_visits_from_id(obs_id)
+            obs_flux_table = obs_flux_table.append(pd.DataFrame(np.array(
+                                                   [obj_flux['object_id'],
+                                                    obj_flux['visit_id'],
+                                                    obj_flux['filter'],
+                                                    obj_flux['psf_flux'],
+                                                    obj_flux['psf_flux_err']]).T,
+                                                    columns = obs_flux_table.columns),
+                                                    ignore_index=True)
+        obs_flux_table['obs_object_id'] = obs_flux_table['obs_object_id'].convert_objects(convert_numeric=True)
+        obs_flux_table['visit_id'] = obs_flux_table['visit_id'].convert_objects(convert_numeric=True)
+        obs_flux_table['psf_flux'] = obs_flux_table['psf_flux'].convert_objects(convert_numeric=True)
+        obs_flux_table['psf_flux_err'] = obs_flux_table['psf_flux_err'].convert_objects(convert_numeric=True)
 
+        flux_statistics = []
+        for visit_num in visit_list:
 #            match_flux = []
             flux_diffs = []
-            for idx in range(len(true_stars)):
-                matches = np.where(ind == idx)[0]
-                distances = dist[matches]
-                if len(distances) > 0:
-                    keep = matches[np.argmin(distances)]
-#                    match_flux.append([obs_objects['psf_flux'][keep],
-#                                       true_stars['true_flux'][idx]])
-                    flux_diffs.append(obs_objects['psf_flux'][keep] -
-                                      true_stars['true_flux'][idx])
-                    dist_statistics.append(np.min(distances))
+            obs_rows = (obs_flux_table['visit_id'] == visit_num)
+            visit_obs = obs_flux_table[['obs_object_id', 'psf_flux']][obs_rows]
+            true_rows = (truth_data['obsHistId'] == visit_num)
+            visit_true = truth_data[['obs_object_id', 'true_flux']][true_rows]
+            visit_data = pd.merge(visit_obs, visit_true, on='obs_object_id')
+            flux_diffs = visit_data['psf_flux'] - visit_data['true_flux']
             f_clip, f_low, f_high = sigmaclip(flux_diffs)
             flux_statistics.append([np.mean(f_clip), np.mean(f_clip**2.),
-                                    dc['mag'][np.where(dc['obsHistId']==visit)[0][0]],
-                                    sc['seeing'][np.where(sc['obsHistId']==visit)[0][0]],
-                                    dc['bandpass'][np.where(dc['obsHistId']==visit)[0][0]],
+                                    dc['mag'][np.where(dc['obsHistId']==visit_num)[0][0]],
+                                    sc['seeing'][np.where(sc['obsHistId']==visit_num)[0][0]],
+                                    dc['bandpass'][np.where(dc['obsHistId']==visit_num)[0][0]],
                                     len(flux_diffs)])
 
         self.flux_stats = pd.DataFrame(flux_statistics,
@@ -236,10 +296,6 @@ class Monitor(object):
                                                 ('depth'), ('seeing'),
                                                 ('bandpass'), ('num_objects')])
 
-        if return_dist is True:
-            return dist_statistics
-        else:
-            return
 
 #        return np.array(match_flux), np.array(flux_diffs)
 
