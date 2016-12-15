@@ -42,4 +42,4 @@
  
 4. ####Test it out!
 
- You should be good to go! Try running the first four cells of the [example notebook](Monitor/examples/lightcurve_example.ipynb). The rest will not work yet because we are still working on establishing database connections from jupyter-dev, but once that is done we will amend this.
+ You should be good to go! Try running the first four cells of the [example notebook](../examples/lightcurve_example.ipynb). The rest will not work yet because we are still working on establishing database connections from jupyter-dev, but once that is done we will amend this.
