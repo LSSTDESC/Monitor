@@ -1,6 +1,14 @@
 ## Steps for setting up jupyter-dev for Monitor
 
-1. ####Setup Kernel Spec
+1. ####SSH in to Cori
+
+  Before you are able to run jupyter-dev with an lsst kernel you'll need to do some setup on Cori.
+
+2. ####Load the anaconda module to get ipython
+
+  Once logged into Cori type: `module load python/2.7-anaconda`
+
+3. ####Setup Kernel Spec
 
   Setup a `kernelspec` (instructions come from [this issue](https://github.com/jupyterhub/jupyterhub/issues/847#issuecomment-267044166)) by running:
   
@@ -12,11 +20,11 @@
   
   with a file named `kernel.json`
   
-2. ####Copy the script [lsst-kernel.sh](lsst-kernel.sh).
+4. ####Copy the script [lsst-kernel.sh](lsst-kernel.sh).
 
  Replace $HOME_DIR with where you have pserv and Monitor repos cloned.
 
-3. ####Modify `~/.local/share/jupyter/kernels/lsst/kernel.json`.
+5. ####Modify `~/.local/share/jupyter/kernels/lsst/kernel.json`.
 
   Change:
   
@@ -40,7 +48,7 @@
  ],
  ```
  
-4. ####Test it out!
+6. ####Test it out!
 
  You should be good to go! Try running the first four cells of the [example notebook](../examples/lightcurve_example.ipynb) **making sure the your notebook is running in the `lsst` kernel**. To change kernels use the `Change Kernel` option under `Kernel` in the jupyter notebook menu bar.
  
