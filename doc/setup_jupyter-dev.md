@@ -50,6 +50,6 @@
  
 6. ####Test it out!
 
- You should be good to go! Try running the first four cells of the [example notebook](../examples/lightcurve_example.ipynb) **making sure the your notebook is running in the `lsst` kernel**. To change kernels use the `Change Kernel` option under `Kernel` in the jupyter notebook menu bar.
+ You should be good to go! Point you web browser to https://jupyter-dev.nersc.gov and login. Once you see the jupyter notebook interface go into the examples folder of your cloned version of `monitor` and open `lightcurve-example.ipynb`. Here's the important part: **switch your notebook so it is running in the `lsst` kernel** (to change kernels use the `Change Kernel` option under `Kernel` in the jupyter notebook menu bar). Then try running the first four cells of the example notebook. If you're all set up correctly you should see the same output as what you see [here](../examples/lightcurve_example.ipynb).
  
- The rest will not work yet because we are still working on establishing database connections from jupyter-dev, but once that is done we will amend this.
+ The rest of the notebook will not work yet because we are still working on establishing database connections from jupyter-dev, but once that is done we will amend this.
