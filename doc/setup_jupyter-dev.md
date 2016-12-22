@@ -14,11 +14,11 @@
   
   `ipython kernel install --user --name lsst`
   
-  and you'll get a directory under:
+  and it will create a directory:
   
   `~/.local/share/jupyter/kernels/lsst`
   
-  with a file named `kernel.json`
+  with a file inside the directory named `kernel.json`.
   
 4. ####Copy the script [lsst-kernel.sh](lsst-kernel.sh).
 
