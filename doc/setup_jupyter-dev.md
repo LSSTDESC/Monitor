@@ -22,7 +22,7 @@
   
 4. ####Copy the script [lsst-kernel.sh](lsst-kernel.sh).
 
- You can copy it to wherever you'd like since you will be manually entering the path for the ipython kernel to follow in the next step. Once copied replace $HOME_DIR in the script with where you have pserv and Monitor repos cloned. Finally, make sure to set the permissions on this file to user and group readable and exectuable:
+ You can copy it to wherever you'd like since you will be manually entering the path for the ipython kernel to follow in the next step. Once you have a copy where you want it then replace $HOME_DIR in the script with where you have pserv and Monitor repos cloned. Finally, make sure to set the permissions on this file to user and group readable and exectuable:
  
  `chmod ug+rx lsst-kernel.sh`
 
