@@ -23,6 +23,8 @@
 4. ####Copy the script [lsst-kernel.sh](lsst-kernel.sh).
 
  Replace $HOME_DIR with where you have pserv and Monitor repos cloned.
+ 
+ Also make sure to set the permissions on this file to user and group readable and exectuable.
 
 5. ####Modify `~/.local/share/jupyter/kernels/lsst/kernel.json`.
 
