@@ -24,7 +24,7 @@
 
  Replace $HOME_DIR with where you have pserv and Monitor repos cloned.
  
- Also make sure to set the permissions on this file to user and group readable and exectuable.
+ Also make sure to set the permissions on this file to user and group readable and exectuable (`chmod ug+rx lsst-kernel.sh`).
 
 5. ####Modify `~/.local/share/jupyter/kernels/lsst/kernel.json`.
 
