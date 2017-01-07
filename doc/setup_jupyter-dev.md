@@ -74,6 +74,7 @@
       }
     }
   ```
+  NOTE: if you already have a `db-auth.paf` file you should add a new `authInfo:{}` inside the `database:{}`, rather than adding a new `database:{}`.
    * Go back to your home directory and change permissions:
    ```
    chmod 700 .lsst
