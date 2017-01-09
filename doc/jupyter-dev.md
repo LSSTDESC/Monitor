@@ -4,7 +4,7 @@
   `Jupyter-Dev` is a system set up at NERSC to run jupyter notebooks on the cori filesystem by simply pointing your web browser to https://jupyter-dev.nersc.gov and using your NERSC credentials. It does take a bit of setup before the first time, but while the jupyter-hub system runs on a server external to Cori the `jupyter-dev` system has access to the Cori filesystem. Thus, it can be configured to run custom kernels set up in your home directory. This allows a user to create LSST stack enabled kernels where LSST software as well as any additional packages required are accessible in a `jupyter` notebook.
   
 ## Why bother with `jupyter-dev`?
-We want to use `jupyter-dev` for our project in order to have a convenient portal to the Twinkles outputs stored in science databases at NERSC. It also gives us a common platform in which to run analysis. The directions below point all users to run a shared version of the LSST stack. Therefore, any notebooks we create in `jupyter-dev` can be easily shared and will work for others using the shared stack in their own `jupyter-dev` browser window.
+We want to use `jupyter-dev` for our project in order to have a convenient portal to the [Twinkles](https://github.com/LSSTDESC/Twinkles/blob/master/README.md) outputs stored in science databases at NERSC. It also gives us a common platform in which to run analysis. The directions below point all users to run a shared version of the LSST stack. Therefore, any notebooks we create in `jupyter-dev` can be easily shared and will work for others using the shared stack in their own `jupyter-dev` browser window.
 
 ## Steps for setting up `jupyter-dev` for the Monitor
 
@@ -60,7 +60,7 @@ We want to use `jupyter-dev` for our project in order to have a convenient porta
  
 6. #### Set up database connection
 
-  Since we need to connect to the NERSC Science Databases to access Twinkles data we need to set up the interface that will allow us to connect.
+  Since we need to connect to the NERSC Science Databases to access [Twinkles](https://github.com/LSSTDESC/Twinkles/blob/master/README.md) data we need to set up the interface that will allow us to connect.
   * First create a `.lsst` folder in your home directory.
   * Contact the Monitor team for the username and password required to access the database.
   * Then create a file `.lsst/db-auth.paf` with the following:
