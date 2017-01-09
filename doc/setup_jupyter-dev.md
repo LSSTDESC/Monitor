@@ -1,3 +1,11 @@
+# Monitor @ NERSC: Introducing jupyter-dev
+
+## What is jupyter-dev?
+  Jupyter-Dev is a system set up at NERSC to run jupyter notebooks on the cori filesystem by simply pointing your web browser to https://jupyter-dev.nersc.gov and using your NERSC credentials. It does take a bit of setup before the first time, but while the jupyter-hub system runs on a server external to Cori the jupyter-dev system has access to the Cori filesystem. Thus, it can be configured to run custom kernels set up in your home directory. This allows a user to create LSST stack enabled kernels where LSST software as well as any additional packages required are accessible in a jupyter notebook.
+  
+## Why bother with jupyter-dev?
+  We want to use jupyter-dev for our project in order to have a convenient portal to the Twinkles outputs stored in science databases at NERSC. This also gives us a common platform in which to run analysis. The directions below point all users to run a shared version of the LSST stack. Therefore, any notebooks we create in jupyter-dev can be easily shared and will work for others using the shared stack in their own jupyter-dev browser window.
+
 ## Steps for setting up jupyter-dev for Monitor
 
 1. ####SSH in to Cori
@@ -66,6 +74,7 @@
       }
     }
   ```
+  NOTE: if you already have a `db-auth.paf` file you should add a new `authInfo:{}` inside the `database:{}`, rather than adding a new `database:{}`.
    * Go back to your home directory and change permissions:
    ```
    chmod 700 .lsst
@@ -75,3 +84,10 @@
 7. ####Test it out!
 
  You should be good to go! Point your web browser to https://jupyter-dev.nersc.gov and login. Once you see the jupyter notebook interface go into the examples folder of your cloned version of `monitor` and open `lightcurve-example.ipynb`. Here's the important part: **switch your notebook so it is running in the `lsst` kernel** (to change kernels use the `Change Kernel` option under `Kernel` in the jupyter notebook menu bar). Then try running the first four cells of the example notebook. If you're all set up correctly you should see the same output as what you see [here](../examples/lightcurve_example.ipynb).
+ 
+## Installing packages from within a notebook
+  If you are in a jupyter-dev notebook and realize you want to add an external pip-installable package it's possible to do without leaving the notebook. Simply use:
+  ```
+  pip install <package_name> --user
+  ```
+  and pip will install a personal copy of the package. Then restart the kernel in your notebook and you should be able to import the package. Futhermore, the package will henceforth be available in any other notebooks you run with the `lsst` kernel.
