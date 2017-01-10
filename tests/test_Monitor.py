@@ -9,7 +9,9 @@ import desc.monitor
 
 class MonitorTestCase(unittest.TestCase):
     def setUp(self):
-        self.dbConn = desc.monitor.dbInterface(database='test_cache.db',
+        self.test_db = 'test_cache.db'
+        subprocess.call('touch %s' % self.test_db, shell=True)
+        self.dbConn = desc.monitor.dbInterface(database=self.test_db,
                                                host=None, port=None,
                                                driver='sqlite')
         self.monitor = desc.monitor.Monitor(self.dbConn)
