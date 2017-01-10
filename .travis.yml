@@ -7,6 +7,7 @@ install:
   - export PATH="$HOME/miniconda/bin:$PATH"
   - source eups-setups.sh
   - pip install coveralls
+  - pip install astroML
   - git clone https://github.com/DarkEnergyScienceCollaboration/pserv.git ../pserv
   - setup lsst_sims
   - setup -r ../pserv -j
