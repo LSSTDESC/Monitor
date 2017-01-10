@@ -2,7 +2,7 @@ from __future__ import absolute_import
 import numpy as np
 from lsst.sims.catalogs.db import DBObject
 
-__all__ = ['dbInterface', 'truthDBInterface']
+__all__ = ['dbInterface', 'truthDBInterface', 'opsimDBInterface']
 
 class dbInterface(object):
 
@@ -209,6 +209,31 @@ class truthDBInterface(object):
                    FROM stars
                    WHERE """ + ' or '.join(('unique_id = ' +
                                          str(n) for n in object_id_tuple)))
+
+        results = self._dbo.execute_arbitrary(query, dtype=dtype)
+
+        return results
+
+class opsimDBInterface(object):
+
+    def __init__(self, database, host=None, port=None, driver='sqlite'):
+
+        self._dbo = DBObject(database=database, host=host, port=port,
+                             driver=driver)
+
+    def get_summary_depth_info_for_visits(self, fieldID):
+
+        dtype = np.dtype([('obsHistID', np.int),
+                          ('FWHMeff', np.float),
+                          ('rawSeeing', np.float),
+                          ('fiveSigmaDepth', np.float),
+                          ('airmass', np.float),
+                          ('filter', str, 300)])
+
+        query = str("""SELECT obsHistID, FWHMeff, rawSeeing, fiveSigmaDepth,
+                              airmass, filter
+                       FROM Summary
+                       WHERE fieldID = %s""" % fieldID)
 
         results = self._dbo.execute_arbitrary(query, dtype=dtype)
 

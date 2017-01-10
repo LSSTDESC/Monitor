@@ -74,6 +74,10 @@ class Monitor(object):
         visit_depths = np.median(visit_flux_err, axis=1)
         visit_depths = 22.5 - 2.5*np.log10(5*visit_depths)
 
+        # psf_area = (np.pi*(((visit_data['seeing']/2)*(1/.2))**2.))
+        # visit_depths = 22.5 - 2.5*np.log10(((5*1e9*visit_data['sky_noise'])*psf_area)/
+        #                                     visit_data['zero_point'])
+
         depth_curve = {}
         depth_curve['bandpass'] = [str('lsst' + x) for x in visit_data['filter']]
         timestamp = Time(visit_data['obs_start'], scale='utc')
