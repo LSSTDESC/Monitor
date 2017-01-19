@@ -35,7 +35,7 @@ class StarCacheDBObj(CatalogDBObject):
                ('galacticAv', 'CONVERT(float, ebv*3.1)'),
                ('radialVelocity', 'vrad'),
                ('variabilityParameters', 'varParamStr', str, 256),
-               ('sedFilename', 'sedfilename', str, 40)]
+               ('sedFilename', 'sedfilename', str, 256)]
 
 class TrueStars(object):
 
