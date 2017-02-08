@@ -319,7 +319,8 @@ class Monitor(object):
 
         return p_lims, n_bins
 
-    def plot_bias_map(self, in_band='r', with_bins=20., use_existing_fig=None):
+    def plot_bias_map(self, in_band='r', with_bins=20., use_existing_fig=None,
+                      normalize=False):
         """
         Plot the mean residuals of each visit as a function of depth and
         seeing.
@@ -349,25 +350,37 @@ class Monitor(object):
                                              (self.flux_stats['bandpass'] == in_band))]
 
                 if len(grid_vals) > 0:
-                    p_val[i,j] = np.average(grid_vals['mean_resid'],
-                                            weights=grid_vals['num_objects'])
+                    if normalize is True:
+                        p_val[i,j] = np.average(grid_vals['mean_resid'] / 
+                                                np.sqrt(grid_vals['mean_sq_resid'] - 
+                                                        grid_vals['mean_resid']**2.),
+                                                weights=grid_vals['num_objects'])
+                    else:
+                        p_val[i,j] = np.average(grid_vals['mean_resid'],
+                                                weights=grid_vals['num_objects'])
 
         if use_existing_fig is not None:
             fig = use_existing_fig
         else:
             fig = plt.figure()
         plt.gca().set_axis_bgcolor('k')
-        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm, vmin=-0.3, vmax=0.3)
+        if normalize is True:
+            plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm, vmin=-1., vmax=1.)
+        else:
+            plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm, vmin=-0.3, vmax=0.3)
         plt.colorbar()
         plt.xlim(p_lims['min_d'], p_lims['max_d'])
         plt.ylim(p_lims['min_s'], p_lims['max_s'])
-        plt.title('Bias in Fluxes for %s filter' % in_band)
+        if normalize is True:
+            plt.title('Normalized Bias in Fluxes for %s filter' % in_band)
+        else:
+            plt.title('Bias in Fluxes for %s filter' % in_band)
         plt.xlabel('5-sigma Depth (mags)')
         plt.ylabel('Observed Seeing (arcsec)')
 
         return fig
 
-    def plot_bias_scatter(self, in_band='r', use_existing_fig=None):
+    def plot_bias_scatter(self, in_band='r', use_existing_fig=None, normalize=False):
 
         p_lims, num_bins = self.set_stats_plot_limits(num_bins=0)
         in_band = str('lsst'+in_band)
@@ -379,15 +392,27 @@ class Monitor(object):
         else:
             fig = plt.figure()
 
+        if normalize is True:
+            c_vals = (self.flux_stats['mean_resid'][idx] / 
+                       np.sqrt((self.flux_stats['mean_sq_resid'][idx] - 
+                                self.flux_stats['mean_resid'][idx]**2.)))
+            vmin = -1.
+            vmax = 1.
+        else:
+            c_vals = (self.flux_stats['mean_resid'][idx])
+            vmin = -0.3
+            vmax = 0.3
         plt.scatter(self.flux_stats['depth'][idx],
                     self.flux_stats['seeing'][idx],
-                    c=(self.flux_stats['mean_resid'][idx]),
-                    cmap=plt.cm.coolwarm, vmin=-0.3, vmax=0.3)
-
+                    c=c_vals,
+                    cmap=plt.cm.coolwarm, vmin=vmin, vmax=vmax, lw=0)
         plt.colorbar()
         plt.xlim(p_lims['min_d']-.05, p_lims['max_d']+.05)
         plt.ylim(p_lims['min_s']-.01, p_lims['max_s']+.01)
-        plt.title('Bias in Fluxes for %s bandpass' % in_band)
+        if normalize is True:
+            plt.title('Normalized Bias in Fluxes for %s bandpass' % in_band)
+        else:
+            plt.title('Bias in Fluxes for %s bandpass' % in_band)
         plt.xlabel('5-sigma Depth (mags)')
         plt.ylabel('Observed Seeing (arcsec)')
 
@@ -426,14 +451,14 @@ class Monitor(object):
                     p_val[i,j] = (np.average(grid_vals['mean_sq_resid'],
                                             weights=grid_vals['num_objects']) -
                                  np.average(grid_vals['mean_resid'],
-                                            weights=grid_vals['num_objects']))
+                                            weights=grid_vals['num_objects'])**2.)
 
         if use_existing_fig is not None:
             fig = use_existing_fig
         else:
             fig = plt.figure()
 
-        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.plasma, vmin=0., vmax=0.6)
+        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.plasma, vmin=0., vmax=0.45)
         plt.colorbar()
         plt.xlim(p_lims['min_d'], p_lims['max_d'])
         plt.ylim(p_lims['min_s'], p_lims['max_s'])
@@ -459,7 +484,7 @@ class Monitor(object):
                     self.flux_stats['seeing'][idx],
                     c=(self.flux_stats['mean_sq_resid'][idx] -
                       (self.flux_stats['mean_resid'][idx])**2),
-                    cmap=plt.cm.plasma, vmin=0, vmax=0.6)
+                    cmap=plt.cm.plasma, vmin=0, vmax=0.45)
 
         plt.colorbar()
         plt.xlim(p_lims['min_d']-.05, p_lims['max_d']+.05)
