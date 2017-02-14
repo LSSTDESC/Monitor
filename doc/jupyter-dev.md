@@ -45,7 +45,7 @@ We want to use `jupyter-dev` for our project in order to have a convenient porta
   "ipykernel",
   "-f",
   "{connection_file}"
- ],
+ ]
  ```
  
  to:
@@ -55,7 +55,7 @@ We want to use `jupyter-dev` for our project in order to have a convenient porta
    "/path/to/lsst-kernel.sh",   
    "-f",   
    "{connection_file}" 
- ],
+ ]
  ```
  
 6. #### Set up database connection
