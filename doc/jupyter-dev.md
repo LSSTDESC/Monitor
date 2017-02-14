@@ -51,10 +51,10 @@ We want to use `jupyter-dev` for our project in order to have a convenient porta
  to:
  
  ```
- "argv": [   
-   "/path/to/lsst-kernel.sh",   
-   "-f",   
-   "{connection_file}" 
+ "argv": [
+  "/path/to/lsst-kernel.sh",   
+  "-f",   
+  "{connection_file}" 
  ]
  ```
  
