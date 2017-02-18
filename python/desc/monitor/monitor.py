@@ -21,6 +21,7 @@ from astropy.time import Time
 from astropy.io import fits
 from astropy.table import Table
 from lsst.utils import getPackageDir
+from lsst.sims.photUtils import calcNeff
 from astroML.crossmatch import crossmatch_angular
 from scipy.stats import sigmaclip
 plt.style.use('ggplot')
@@ -29,10 +30,13 @@ __all__ = ['Monitor', 'LightCurve', 'SeeingCurve']
 # ==============================================================================
 
 class Monitor(object):
+
     '''
     Simple class for extracting DM forced photometry light curves.
     '''
+
     def __init__(self, dbConn, truth_dbConn=None):
+
         self.dbConn = dbConn
         self.truth_dbConn = truth_dbConn
         self.return_lightcurve = {}
@@ -43,6 +47,7 @@ class Monitor(object):
         return
 
     def get_lightcurves(self, lc_list):
+
         """
         Get the database information for a list of lightcurves and store it.
         """
@@ -52,7 +57,8 @@ class Monitor(object):
                 self.return_lightcurve[lc_id] = LightCurve(self.dbConn)
                 self.return_lightcurve[lc_id].build_lightcurve_from_db(lc_id)
 
-    def measure_depth_curve(self):
+    def measure_depth_curve(self, using='DM'):
+
         """
         Find the 5-sigma limiting depth in each visit.
         """
@@ -61,22 +67,35 @@ class Monitor(object):
             self.get_best_seeing_visit()
 
         visit_data = self.dbConn.get_all_visit_info()
-        stars = self.get_stars(in_visit=self.best_seeing['ccd_visit_id'],
-                               with_sigma_clipping=True)
-        visit_flux_err = []
+        if using == 'stars':
+            stars = self.get_stars(in_visit=self.best_seeing['ccd_visit_id'],
+                                   with_sigma_clipping=True)
 
-        for star in stars:
-            star_data = self.dbConn.all_fs_visits_from_id(star['object_id'])
-            self.star_data = star_data
-            visit_flux_err.append(star_data['psf_flux_err'])
+            visit_flux_err = []
 
-        visit_flux_err = np.array(visit_flux_err).T
-        visit_depths = np.median(visit_flux_err, axis=1)
-        visit_depths = 22.5 - 2.5*np.log10(5*visit_depths)
+            for star in stars:
+                star_data = self.dbConn.all_fs_visits_from_id(star['object_id'])
+                self.star_data = star_data
+                visit_flux_err.append(star_data['psf_flux_err'])
+            
+            visit_flux_err = np.array(visit_flux_err).T
+            visit_depths = np.median(visit_flux_err, axis=1)
+            visit_depths = 22.5 - 2.5*np.log10(5*visit_depths)
 
-        # psf_area = (np.pi*(((visit_data['seeing']/2)*(1/.2))**2.))
-        # visit_depths = 22.5 - 2.5*np.log10(((5*1e9*visit_data['sky_noise'])*psf_area)/
-        #                                     visit_data['zero_point'])
+        elif using == 'DM':
+
+            #visit_depths = 22.5 - 2.5*np.log10(((5*1e9*visit_data['sky_noise'])*psf_area)/
+            #                                   visit_data['zero_point'])
+            #Here we use the function outlined in simple_error_model.ipynb
+
+            psf_area = calcNeff(visit_data['seeing'], 0.2)
+            n = visit_data['sky_noise']*np.sqrt(psf_area)
+            f5_signal = (1e9*(25 + 25*((1+(4*(n**2)/25))**.5))/2)/visit_data['zero_point']
+            visit_depths = 22.5 - 2.5*np.log10(f5_signal)
+
+        else:
+            raise IOError("Don't understand using == %s. Please specify 'stars' or " +
+                          "'DM'" % using)
 
         depth_curve = {}
         depth_curve['bandpass'] = [str('lsst' + x) for x in visit_data['filter']]
@@ -92,6 +111,7 @@ class Monitor(object):
         return dc
 
     def measure_seeing_curve(self):
+
         """
         Find the seeing in each visit.
         """
