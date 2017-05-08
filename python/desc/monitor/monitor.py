@@ -20,6 +20,7 @@ import warnings
 from astropy.time import Time
 from astropy.io import fits
 from lsst.utils import getPackageDir
+from lsst.sims.photUtils import calcNeff
 from astroML.crossmatch import crossmatch_angular
 from scipy.stats import sigmaclip
 plt.style.use('ggplot')
@@ -29,6 +30,7 @@ __all__ = ['Monitor', 'LightCurve', 'SeeingCurve']
 
 
 class Monitor(object):
+
     '''
     Simple class for extracting DM forced photometry light curves.
 
@@ -72,7 +74,9 @@ class Monitor(object):
         on differences between object fluxes in the simulated input "truth"
         catalog and the DM processed outputs in the dbConn database.
     '''
+
     def __init__(self, dbConn, truth_dbConn=None):
+
         self.dbConn = dbConn
         self.truth_dbConn = truth_dbConn
         self.return_lightcurve = {}
@@ -83,6 +87,7 @@ class Monitor(object):
         return
 
     def get_lightcurves(self, lc_list):
+
         """
         Get the database information for a list of lightcurves and store it.
 
@@ -104,7 +109,7 @@ class Monitor(object):
 
         Parameters
         ----------
-        method : str, ('DM', 'DM_modified', 'flux_errors'), default='DM':
+        method : str, ('DM', 'DM_modified', 'stars'), default='DM':
             Sets the method for calculating the 5 sigma depth of a visit. The
             'DM' method uses the seeing and sky_noise values from the visit
             table in the results database. See the simple_error_model notebook
@@ -123,7 +128,7 @@ class Monitor(object):
 
         visit_data = self.dbConn.get_all_visit_info()
 
-        if using == 'flux_errors':
+        if using == 'stars':
 
             stars = self.get_stars(in_visit=self.best_seeing['ccd_visit_id'],
                                    with_sigma_clipping=True)
@@ -152,6 +157,10 @@ class Monitor(object):
                          visit_data['zero_point'])
             visit_depths = 22.5 - 2.5*np.log10(f5_signal)
 
+        else:
+            raise IOError("Don't understand using == %s. Please specify"
+                          " 'DM' or 'DM_modified' or 'stars'" % using)
+
         depth_curve = {}
         depth_curve['bandpass'] = [str('lsst' + x) for x in
                                    visit_data['filter']]
@@ -167,6 +176,7 @@ class Monitor(object):
         return dc
 
     def measure_seeing_curve(self):
+
         """
         Find the seeing in each visit.
 
