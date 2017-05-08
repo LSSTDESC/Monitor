@@ -103,18 +103,19 @@ class Monitor(object):
                 self.return_lightcurve[lc_id] = LightCurve(self.dbConn)
                 self.return_lightcurve[lc_id].build_lightcurve_from_db(lc_id)
 
-    def measure_depth_curve(self, using='DM'):
+    def measure_depth_curve(self, using='DM_modified'):
         """
         Find the 5-sigma limiting depth in each visit and return as lightcurve.
 
         Parameters
         ----------
-        method : str, ('DM', 'DM_modified', 'stars'), default='DM':
+        method : str, ('DM_modified', 'DM', 'stars'), default='DM_modified':
             Sets the method for calculating the 5 sigma depth of a visit. The
-            'DM' method uses the seeing and sky_noise values from the visit
-            table in the results database. See the simple_error_model notebook
-            in the examples folder for more information and an explanation
-            of the other methods.
+            'DM' and 'DM_modified' methods use the seeing and sky_noise values
+            from the visit table in the results database. See the
+            simple_error_model notebook in the examples folder for more
+            information. The 'stars' method uses the flux errors from the
+            stars in the visits of a Twinkles run to calculate image depth.
 
         Returns
         -------
@@ -221,7 +222,8 @@ class Monitor(object):
 
         Returns
         -------
-        test_objects : 
+        test_objects : numpy recarray
+            Numpy recarray with the stars from the desired visit.
         """
         visit_data = self.dbConn.get_all_objects_in_visit(in_visit)
 
@@ -260,7 +262,7 @@ class Monitor(object):
         """
 
         visit_data = self.dbConn.get_all_visit_info()
-        i_visits = visit_data[np.where(visit_data['filter']=='i')]
+        i_visits = visit_data[np.where(visit_data['filter'] == 'i')]
         best_i_visit = i_visits[np.argmin(i_visits['seeing'])]
         self.best_seeing = best_i_visit
 
@@ -282,10 +284,10 @@ class Monitor(object):
         true_ra_dec = np.empty((len(true_pos), 2), dtype=np.float64)
         obs_ra_dec = np.empty((len(obs_pos), 2), dtype=np.float64)
 
-        true_ra_dec[:,0] = true_pos['ra']
-        true_ra_dec[:,1] = true_pos['dec']
-        obs_ra_dec[:,0] = obs_pos['ra']
-        obs_ra_dec[:,1] = obs_pos['dec']
+        true_ra_dec[:, 0] = true_pos['ra']
+        true_ra_dec[:, 1] = true_pos['dec']
+        obs_ra_dec[:, 0] = obs_pos['ra']
+        obs_ra_dec[:, 1] = obs_pos['dec']
 
         print('Starting angular crossmatch')
         dist, ind = crossmatch_angular(obs_ra_dec, true_ra_dec, within_radius)
