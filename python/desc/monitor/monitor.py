@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 import warnings
 from astropy.time import Time
 from astropy.io import fits
-from astropy.table import Table
 from lsst.utils import getPackageDir
 from astroML.crossmatch import crossmatch_angular
 from scipy.stats import sigmaclip
@@ -28,9 +27,50 @@ plt.style.use('ggplot')
 __all__ = ['Monitor', 'LightCurve', 'SeeingCurve']
 # ==============================================================================
 
+
 class Monitor(object):
     '''
     Simple class for extracting DM forced photometry light curves.
+
+    ...
+
+    Parameters
+    ----------
+    dbConn : dbInterface instance
+        This is a connection to a science database with the LSST DM processed
+        data products, e.g. a NERSC hosted pserv database.
+
+        For an example see the 'depth_curve_example' notebook
+        in the examples folder.
+
+    truth_dbConn : truthDBInterface instance, optional
+        This is a connection to a database containing simulation inputs. This
+        will be necessary for methods comparing DM processed results to
+        simulation inputs such as the match_catalogs method.
+
+    Attributes
+    ----------
+
+    return_lightcurve : dictionary
+        A dictionary of LightCurve objects where the keys are the ids of the
+        objects in the dbConn database.
+
+    num_visits : int
+        The total number of visits for which there are objects in the dbConn
+        database.
+
+    best_seeing : int or None (default None)
+        The visit id of the best seeing i-band visit in the dbConn database.
+
+    matched_ids : pandas dataframe or None (default None)
+        A pandas dataframe containing the dbConn database id numbers for
+        objects that are matched to the truth database with match_catalogs
+        along with the respective truth database object ids.
+
+    flux_stats : pandas dataframe
+        Set when using the calc_flux_residual method. Contains information
+        on differences between object fluxes in the simulated input "truth"
+        catalog and the DM processed outputs in the dbConn database.
     '''
     def __init__(self, dbConn, truth_dbConn=None):
         self.dbConn = dbConn
@@ -45,6 +85,12 @@ class Monitor(object):
     def get_lightcurves(self, lc_list):
         """
         Get the database information for a list of lightcurves and store it.
+
+        Parameters
+        ----------
+        lc_list : list
+            List of object ids for which to get lightcurves from the results
+            database.
         """
 
         for lc_id in lc_list:
@@ -52,34 +98,63 @@ class Monitor(object):
                 self.return_lightcurve[lc_id] = LightCurve(self.dbConn)
                 self.return_lightcurve[lc_id].build_lightcurve_from_db(lc_id)
 
-    def measure_depth_curve(self):
+    def measure_depth_curve(self, using='DM'):
         """
-        Find the 5-sigma limiting depth in each visit.
+        Find the 5-sigma limiting depth in each visit and return as lightcurve.
+
+        Parameters
+        ----------
+        method : str, ('DM', 'DM_modified', 'flux_errors'), default='DM':
+            Sets the method for calculating the 5 sigma depth of a visit. The
+            'DM' method uses the seeing and sky_noise values from the visit
+            table in the results database. See the simple_error_model notebook
+            in the examples folder for more information and an explanation
+            of the other methods.
+
+        Returns
+        -------
+        dc : lightcurve object
+            The 5-sigma limiting depth at each visit stored in a lightcurve
+            object.
         """
 
         if self.best_seeing is None:
             self.get_best_seeing_visit()
 
         visit_data = self.dbConn.get_all_visit_info()
-        stars = self.get_stars(in_visit=self.best_seeing['ccd_visit_id'],
-                               with_sigma_clipping=True)
-        visit_flux_err = []
 
-        for star in stars:
-            star_data = self.dbConn.all_fs_visits_from_id(star['object_id'])
-            self.star_data = star_data
-            visit_flux_err.append(star_data['psf_flux_err'])
+        if using == 'flux_errors':
 
-        visit_flux_err = np.array(visit_flux_err).T
-        visit_depths = np.median(visit_flux_err, axis=1)
-        visit_depths = 22.5 - 2.5*np.log10(5*visit_depths)
+            stars = self.get_stars(in_visit=self.best_seeing['ccd_visit_id'],
+                                   with_sigma_clipping=True)
+            visit_flux_err = []
 
-        # psf_area = (np.pi*(((visit_data['seeing']/2)*(1/.2))**2.))
-        # visit_depths = 22.5 - 2.5*np.log10(((5*1e9*visit_data['sky_noise'])*psf_area)/
-        #                                     visit_data['zero_point'])
+            for star in stars:
+                star_db = self.dbConn.all_fs_visits_from_id(star['object_id'])
+                visit_flux_err.append(star_db['psf_flux_err'])
+
+            visit_flux_err = np.array(visit_flux_err).T
+            visit_depths = np.median(visit_flux_err, axis=1)
+            visit_depths = 22.5 - 2.5*np.log10(5*visit_depths)
+
+        elif using == 'DM':
+
+            psf_area = (np.pi*(((visit_data['seeing']/2)*(1/.2))**2.))
+            sky_noise_5_sigma = (5*1e9*visit_data['sky_noise'])
+            visit_depths = 22.5 - 2.5*np.log10((sky_noise_5_sigma * psf_area) /
+                                               visit_data['zero_point'])
+
+        elif using == 'DM_modified':
+
+            psf_area = (np.pi*(((visit_data['seeing']/2)*(1/.2))**2.))
+            sky_noise = visit_data['sky_noise']*np.sqrt(psf_area)
+            f5_signal = ((1e9*(25 + 25*((1+(4*(sky_noise**2)/25))**.5))/2) /
+                         visit_data['zero_point'])
+            visit_depths = 22.5 - 2.5*np.log10(f5_signal)
 
         depth_curve = {}
-        depth_curve['bandpass'] = [str('lsst' + x) for x in visit_data['filter']]
+        depth_curve['bandpass'] = [str('lsst' + x) for x in
+                                   visit_data['filter']]
         timestamp = Time(visit_data['obs_start'], scale='utc')
         depth_curve['mjd'] = timestamp.mjd
         depth_curve['obsHistId'] = visit_data['visit_id']
@@ -94,6 +169,11 @@ class Monitor(object):
     def measure_seeing_curve(self):
         """
         Find the seeing in each visit.
+
+        Returns
+        -------
+        sc : SeeingCurve object
+            Stores the seeing for all the visits.
         """
 
         visit_data = self.dbConn.get_all_visit_info()
@@ -109,28 +189,50 @@ class Monitor(object):
 
         return sc
 
-    def get_stars(self, in_visit=None, fainter_than=None, with_sigma_clipping=False):
+    def get_stars(self, in_visit, fainter_than=None,
+                  with_sigma_clipping=False):
         """
         Get the stars from the pserv database for a visit.
 
         Can return only stars fainter than a given magnitude.
+
+        Parameters
+        ----------
+        in_visit : int
+            Specifies the visit number of the observations.
+
+        fainter_than : float or None
+            Sets the upper limit on magnitude of the stars that should be
+            returned.
+
+        with_sigma_clipping : Boolean, default=False
+            If set to True then only stars with magnitudes within 3 standard
+            deviations of the median value will be returned.
+
+        Returns
+        -------
+        test_objects : 
         """
         visit_data = self.dbConn.get_all_objects_in_visit(in_visit)
 
         if fainter_than is not None:
             max_flux = np.power(10, (fainter_than - 22.5)/-2.5)
-            visit_data = visit_data[np.where(visit_data['psf_flux'] < max_flux)]
+            visit_data = visit_data[np.where(visit_data['psf_flux'] <
+                                             max_flux)]
 
         if with_sigma_clipping is True:
             median_val = np.median(visit_data['psf_flux'])
             std_val = np.std(visit_data['psf_flux'])
             max_cut = median_val + (3. * std_val)
             min_cut = median_val - (3. * std_val)
-            keep_objects = visit_data[np.where((visit_data['psf_flux'] < max_cut)
-                                             & (visit_data['psf_flux'] > min_cut))]
+            keep_objects = visit_data[np.where((visit_data['psf_flux'] <
+                                                max_cut) &
+                                               (visit_data['psf_flux'] >
+                                                min_cut))]
             np.random.seed(42)
-            test_objects = np.random.choice(keep_objects, size=100, replace=False)
-            ### Prune those that do not have values in all visits
+            test_objects = np.random.choice(keep_objects, size=100,
+                                            replace=False)
+            # Prune those that do not have values in all visits
             full_visits = []
             for star_num in range(len(test_objects)):
                 star_visits = self.dbConn.forcedSourceFromId(test_objects[star_num]['object_id'])
@@ -656,7 +758,8 @@ class LightCurve(BaseCurve):
             if include_errors is True:
                 using_error_mjd = self.lightcurve[str(using+'_error')][self.lightcurve['bandpass']==filt_name].values
                 plt.errorbar(filt_mjd, using_mjd, yerr=using_error_mjd,
-                         ls='None', marker='.', ms=3, c=color[plot_num-1])
+                         ls='None', marker='.', ms=3, c=color[plot_num-1],
+                         capsize=4)
             else:
                 plt.scatter(filt_mjd, using_mjd, c='purple', marker='+')
             plt.locator_params(axis='x',nbins=5)
