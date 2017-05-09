@@ -5,7 +5,7 @@ All rights reserved.
 This software may be modified and distributed under the terms
 of the modified BSD license.  See the LICENSE file for details.
 """
-# ==============================================================================
+# =============================================================================
 
 from __future__ import print_function
 from __future__ import absolute_import, division
@@ -20,13 +20,12 @@ import warnings
 from astropy.time import Time
 from astropy.io import fits
 from lsst.utils import getPackageDir
-from lsst.sims.photUtils import calcNeff
 from astroML.crossmatch import crossmatch_angular
 from scipy.stats import sigmaclip
 plt.style.use('ggplot')
 
 __all__ = ['Monitor', 'LightCurve', 'SeeingCurve']
-# ==============================================================================
+# =============================================================================
 
 
 class Monitor(object):
@@ -172,7 +171,7 @@ class Monitor(object):
         depth_curve['mag_error'] = np.zeros(self.num_visits)
 
         dc = LightCurve(self.dbConn)
-        dc.build_lightcurve(depth_curve)
+        dc._build_lightcurve(depth_curve)
 
         return dc
 
@@ -189,14 +188,15 @@ class Monitor(object):
 
         visit_data = self.dbConn.get_all_visit_info()
         seeing_info = {}
-        seeing_info['bandpass'] = [str('lsst' + x) for x in visit_data['filter']]
+        seeing_info['bandpass'] = [str('lsst' + x) for x in
+                                   visit_data['filter']]
         timestamp = Time(visit_data['obs_start'], scale='utc')
         seeing_info['mjd'] = timestamp.mjd
         seeing_info['obsHistId'] = visit_data['visit_id']
         seeing_info['seeing'] = visit_data['seeing']
 
         sc = SeeingCurve(self.dbConn)
-        sc.build_seeing_curve(seeing_info)
+        sc._build_seeing_curve(seeing_info)
 
         return sc
 
@@ -247,7 +247,8 @@ class Monitor(object):
             # Prune those that do not have values in all visits
             full_visits = []
             for star_num in range(len(test_objects)):
-                star_visits = self.dbConn.forcedSourceFromId(test_objects[star_num]['object_id'])
+                star_visits = self.dbConn.forcedSourceFromId(
+                                           test_objects[star_num]['object_id'])
                 if len(star_visits) == self.num_visits:
                     full_visits.append(star_num)
             test_objects = test_objects[full_visits]
@@ -259,6 +260,12 @@ class Monitor(object):
     def get_best_seeing_visit(self):
         """
         Get the i-band visit with the best seeing in arcseconds.
+
+        Attributes
+        ----------
+        best_seeing : int or None (default None)
+            The visit id of the best seeing i-band visit in
+            the dbConn database.
         """
 
         visit_data = self.dbConn.get_all_visit_info()
@@ -267,10 +274,33 @@ class Monitor(object):
         self.best_seeing = best_i_visit
 
     def match_catalogs(self, within_radius=1./3600., return_distance=False):
-
         """
         Match the ids from the truth catalog and the data catalog by
         ra,dec positions.
+
+        Parameters
+        ----------
+        within_radius : float, default=1./3600.
+            The search radius (in degrees) for matching objects in the two
+            catalogs. The default setting is one arcsec.
+
+        return_distance : boolean, default=False
+            If true this will return the distances of each matched object in
+            the data catalog from the object in the truth catalog.
+
+        Returns
+        -------
+        matched_distance : numpy array, optional
+            Returned when return_distance is True. Records distances in
+            degrees for the matched data catalog object to the respective
+            truth catalog object.
+
+        Attributes
+        ----------
+        matched_ids : pandas dataframe or None (default None)
+            A pandas dataframe containing the dbConn database id numbers for
+            objects that are matched to the truth database with match_catalogs
+            along with the respective truth database object ids.
         """
 
         print('Querying Truth Catalog')
@@ -311,24 +341,43 @@ class Monitor(object):
         print('Done')
 
         self.matched_ids = pd.DataFrame(true_obs_match_ids,
-                                        columns = ('truth_object_id',
-                                                   'obs_object_id',
-                                                   'num_matches'))
+                                        columns=('truth_object_id',
+                                                 'obs_object_id',
+                                                 'num_matches'))
 
         if return_distance is True:
             return np.array(matched_distance)
         else:
             return
 
-    def calc_flux_residuals(self, for_visits=None, with_depth_curve=None,
-                            with_seeing_curve=None):
+    def calc_flux_residuals(self, depth_curve, seeing_curve, for_visits=None):
         """
         Get the truth data and the observed data then subtract the fluxes
         to get the differences.
+
+        Parameters
+        ----------
+        depth_curve : LightCurve Object
+            Depth curve from measure_depth_curve method.
+
+        seeing_curve : SeeingCurve Object
+            Seeing curve from measure_seeing_curve method.
+
+        for_visits : list or None, default=None
+            List of the visits to use in the comparison. If set to None
+            then it uses all available visits.
+
+        Attributes
+        ----------
+        flux_stats : pandas dataframe
+            Contains information on differences between object fluxes in the
+            simulated input "truth" catalog and the DM processed outputs in
+            the dbConn database.
+
         """
 
-        dc = with_depth_curve.lightcurve
-        sc = with_seeing_curve.seeing_curve
+        dc = depth_curve.lightcurve
+        sc = seeing_curve.seeing_curve
 
         warnings.simplefilter('always', UserWarning)
 
@@ -336,10 +385,12 @@ class Monitor(object):
             print('Matching Catalogs')
             self.match_catalogs()
 
-        match_dict = dict((k,v) for (k,v) in zip(self.matched_ids['truth_object_id'],
-                                                 self.matched_ids['obs_object_id']))
+        match_dict = dict((k, v) for (k, v) in zip(
+                                        self.matched_ids['truth_object_id'],
+                                        self.matched_ids['obs_object_id']))
 
-        truth_data = self.truth_dbConn.get_all_info_by_object_id(self.matched_ids['truth_object_id'])
+        truth_data = self.truth_dbConn.get_all_info_by_object_id(
+                                        self.matched_ids['truth_object_id'])
         truth_data = pd.DataFrame(truth_data)
         id_match = []
         for true_id in truth_data['object_id']:
@@ -353,11 +404,11 @@ class Monitor(object):
             visit_list = []
             for visit_num in for_visits:
                 ccd_visit = all_visits[np.where(all_visits['visit_id'] ==
-                                                    visit_num)]['ccd_visit_id']
+                                                visit_num)]['ccd_visit_id']
                 if len(ccd_visit) < 1:
                     warnings.warn("You have specified a visit that does" +
-                                      " not exist in your project data.  " +
-                                      "Skipping over visit %i." % visit_num)
+                                  " not exist in your project data.  " +
+                                  "Skipping over visit %i." % visit_num)
                 else:
                     ccd_visit_list.append(ccd_visit[0])
                     visit_list.append(visit_num)
@@ -366,34 +417,40 @@ class Monitor(object):
             visit_list = all_visits['visit_id']
 
         print('Querying for object fluxes')
-        obs_flux_table = pd.DataFrame(columns = ('obs_object_id',
-                                                 'visit_id',
-                                                 'filter',
-                                                 'psf_flux',
-                                                 'psf_flux_err'))
+        obs_flux_table = pd.DataFrame(columns=('obs_object_id',
+                                               'visit_id',
+                                               'filter',
+                                               'psf_flux',
+                                               'psf_flux_err'))
         obj_queried = 0
         for obs_id in self.matched_ids['obs_object_id']:
             if obj_queried % 100 == 0:
                 print('Loaded %i out of %i objects' % (obj_queried,
                                                        len(self.matched_ids)))
-            obj_queried+=1
+            obj_queried += 1
             obj_flux = self.dbConn.all_fs_visits_from_id(obs_id)
             obs_flux_table = obs_flux_table.append(pd.DataFrame(np.array(
-                                                   [obj_flux['object_id'],
-                                                    obj_flux['visit_id'],
-                                                    obj_flux['filter'],
-                                                    obj_flux['psf_flux'],
-                                                    obj_flux['psf_flux_err']]).T,
-                                                    columns = obs_flux_table.columns),
-                                                    ignore_index=True)
-        obs_flux_table['obs_object_id'] = obs_flux_table['obs_object_id'].convert_objects(convert_numeric=True)
-        obs_flux_table['visit_id'] = obs_flux_table['visit_id'].convert_objects(convert_numeric=True)
-        obs_flux_table['psf_flux'] = obs_flux_table['psf_flux'].convert_objects(convert_numeric=True)
-        obs_flux_table['psf_flux_err'] = obs_flux_table['psf_flux_err'].convert_objects(convert_numeric=True)
+                                            [obj_flux['object_id'],
+                                             obj_flux['visit_id'],
+                                             obj_flux['filter'],
+                                             obj_flux['psf_flux'],
+                                             obj_flux['psf_flux_err']]).T,
+                                            columns=obs_flux_table.columns),
+                                            ignore_index=True)
+        obs_flux_table['obs_object_id'] = \
+            obs_flux_table['obs_object_id'].convert_objects(
+                                                        convert_numeric=True)
+        obs_flux_table['visit_id'] = \
+            obs_flux_table['visit_id'].convert_objects(convert_numeric=True)
+        obs_flux_table['psf_flux'] = \
+            obs_flux_table['psf_flux'].convert_objects(convert_numeric=True)
+        obs_flux_table['psf_flux_err'] = \
+            obs_flux_table['psf_flux_err'].convert_objects(
+                                                        convert_numeric=True)
 
         flux_statistics = []
         for visit_num in visit_list:
-#            match_flux = []
+            # match_flux = []
             flux_diffs = []
             obs_rows = (obs_flux_table['visit_id'] == visit_num)
             visit_obs = obs_flux_table[['obs_object_id', 'psf_flux']][obs_rows]
@@ -402,14 +459,19 @@ class Monitor(object):
             visit_data = pd.merge(visit_obs, visit_true, on='obs_object_id')
             flux_diffs = visit_data['psf_flux'] - visit_data['true_flux']
             f_clip, f_low, f_high = sigmaclip(flux_diffs)
-            flux_statistics.append([np.mean(f_clip), np.mean(f_clip**2.),
-                                    dc['mag'][np.where(dc['obsHistId']==visit_num)[0][0]],
-                                    sc['seeing'][np.where(sc['obsHistId']==visit_num)[0][0]],
-                                    dc['bandpass'][np.where(dc['obsHistId']==visit_num)[0][0]],
-                                    len(flux_diffs)])
+            visit_depth = dc['mag'][np.where(dc['obsHistId'] ==
+                                             visit_num)[0][0]]
+            visit_seeing = sc['seeing'][np.where(sc['obsHistId'] ==
+                                                 visit_num)[0][0]]
+            visit_bandpass = dc['bandpass'][np.where(dc['obsHistId'] ==
+                                                     visit_num)[0][0]]
+            flux_statistics.append([visit_num, np.mean(f_clip),
+                                    np.mean(f_clip**2.),
+                                    visit_depth, visit_seeing,
+                                    visit_bandpass, len(flux_diffs)])
 
         self.flux_stats = pd.DataFrame(flux_statistics,
-                                       columns=[('mean_resid'),
+                                       columns=[('visit_id'), ('mean_resid'),
                                                 ('mean_sq_resid'),
                                                 ('depth'), ('seeing'),
                                                 ('bandpass'), ('num_objects')])
@@ -417,9 +479,24 @@ class Monitor(object):
 
 #        return np.array(match_flux), np.array(flux_diffs)
 
-    def set_stats_plot_limits(self, num_bins=[20., 20.]):
+    def _set_stats_plot_limits(self, num_bins=20.):
         """
         Set limits for plots of bias and sigma.
+
+        Parameters
+        ----------
+        num_bins : float or length 2 list, default=20.
+            The number of bins in the depth and seeing respectively. Can use a
+            single number to set both bins to the same number.
+
+        Returns
+        -------
+        p_lims : dict
+            Dictionary of maximum and minimum depths and seeing values for
+            plotting methods.
+
+        n_bins : length 2 list
+            Number of bins in depth and seeing for plotting methods.
         """
 
         if num_bins is not list:
@@ -436,11 +513,33 @@ class Monitor(object):
     def plot_bias_map(self, in_band='r', with_bins=20., use_existing_fig=None,
                       normalize=False):
         """
-        Plot the mean residuals of each visit as a function of depth and
-        seeing.
+        Plot the mean residuals of each visit in a 2-d grid as a function of
+        depth and seeing.
+
+        Parameters
+        ----------
+        in_band : str, default = 'r'
+            The bandpass for the comparison. ('u', 'g', 'r', 'i', 'z', or 'y')
+
+        with_bins : float or length 2 list, default = 20.
+            The number of bins to use to plot the depth and seeing values
+            respectively.
+
+        use_existing_fig : matplotlib figure or None, default=None
+            Can use an existing matplotlib figure or if set to None will
+            return a new figure.
+
+        normalize : Boolean, default=False
+            If true, the plot values will be normalized by the standard
+            deviation of the flux results in each bin.
+
+        Returns
+        -------
+        fig : matplotlib figure
+            Bias map with depth and seeing as axes.
         """
 
-        p_lims, num_bins = self.set_stats_plot_limits(num_bins=with_bins)
+        p_lims, num_bins = self._set_stats_plot_limits(num_bins=with_bins)
         in_band = str('lsst'+in_band)
 
         d_grid, s_grid = np.meshgrid(np.linspace(p_lims['min_d']-.01,
@@ -449,29 +548,37 @@ class Monitor(object):
                                      np.linspace(p_lims['min_s']-.01,
                                                  p_lims['max_s']+.01,
                                                  num=num_bins[1]+1))
-        p_lims['delta_d'] = d_grid[0,1] - d_grid[0,0]
-        p_lims['delta_s'] = s_grid[1,0] - s_grid[0,0]
+        p_lims['delta_d'] = d_grid[0, 1] - d_grid[0, 0]
+        p_lims['delta_s'] = s_grid[1, 0] - s_grid[0, 0]
         p_val = np.zeros(np.shape(d_grid))
         for i in range(np.shape(d_grid)[0]):
             for j in range(np.shape(s_grid)[0]):
-                depth_grid_vals = self.flux_stats[((self.flux_stats['depth'] >= d_grid[i,j]) &
-                                                   (self.flux_stats['depth'] < (d_grid[i,j] +
-                                                                                p_lims['delta_d'])) &
-                                                   (self.flux_stats['bandpass'] == in_band))]
-                grid_vals = depth_grid_vals[((depth_grid_vals['seeing'] >= s_grid[i,j]) &
-                                            (depth_grid_vals['seeing'] < (s_grid[i,j] +
-                                                                          p_lims['delta_s'])) &
-                                             (self.flux_stats['bandpass'] == in_band))]
+                depth_vals = self.flux_stats[((self.flux_stats['depth'] >=
+                                               d_grid[i, j]) &
+                                              (self.flux_stats['depth'] <
+                                               (d_grid[i, j] +
+                                                p_lims['delta_d'])) &
+                                              (self.flux_stats['bandpass'] ==
+                                               in_band))]
+                grid_vals = depth_vals[((depth_vals['seeing'] >=
+                                         s_grid[i, j]) &
+                                        (depth_vals['seeing'] <
+                                         (s_grid[i, j] + p_lims['delta_s'])) &
+                                        (self.flux_stats['bandpass'] ==
+                                         in_band))]
 
                 if len(grid_vals) > 0:
                     if normalize is True:
-                        p_val[i,j] = np.average(grid_vals['mean_resid'] / 
-                                                np.sqrt(grid_vals['mean_sq_resid'] - 
-                                                        grid_vals['mean_resid']**2.),
-                                                weights=grid_vals['num_objects'])
+                        p_val[i, j] = np.average(grid_vals['mean_resid'] /
+                                                 np.sqrt(
+                                                  grid_vals['mean_sq_resid'] -
+                                                  grid_vals['mean_resid']**2.),
+                                                 weights=grid_vals[
+                                                                'num_objects'])
                     else:
-                        p_val[i,j] = np.average(grid_vals['mean_resid'],
-                                                weights=grid_vals['num_objects'])
+                        p_val[i, j] = np.average(grid_vals['mean_resid'],
+                                                 weights=grid_vals[
+                                                                'num_objects'])
 
         if use_existing_fig is not None:
             fig = use_existing_fig
@@ -479,9 +586,11 @@ class Monitor(object):
             fig = plt.figure()
         plt.gca().set_axis_bgcolor('k')
         if normalize is True:
-            plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm, vmin=-1., vmax=1.)
+            plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm,
+                       vmin=-1., vmax=1.)
         else:
-            plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm, vmin=-0.3, vmax=0.3)
+            plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.coolwarm,
+                       vmin=-0.3, vmax=0.3)
         plt.colorbar()
         plt.xlim(p_lims['min_d'], p_lims['max_d'])
         plt.ylim(p_lims['min_s'], p_lims['max_s'])
@@ -494,9 +603,31 @@ class Monitor(object):
 
         return fig
 
-    def plot_bias_scatter(self, in_band='r', use_existing_fig=None, normalize=False):
+    def plot_bias_scatter(self, in_band='r', use_existing_fig=None,
+                          normalize=False):
+        """
+        Plot the mean residuals of each visit individually as a function
+        of depth and seeing.
 
-        p_lims, num_bins = self.set_stats_plot_limits(num_bins=0)
+        Parameters
+        ----------
+        in_band : str, default = 'r'
+            The bandpass for the comparison. ('u', 'g', 'r', 'i', 'z', or 'y')
+
+        use_existing_fig : matplotlib figure or None, default=None
+            Can use an existing matplotlib figure or if set to None will
+            return a new figure.
+
+        normalize : Boolean, default=False
+            If true, the plot values will be normalized by the standard
+            deviation of the flux results in each bin.
+
+        Returns
+        -------
+        fig : matplotlib figure
+            Bias scatter plot with depth and seeing as axes.
+        """
+        p_lims, num_bins = self._set_stats_plot_limits(num_bins=0)
         in_band = str('lsst'+in_band)
 
         idx = np.where(self.flux_stats['bandpass'] == in_band)[0]
@@ -507,9 +638,9 @@ class Monitor(object):
             fig = plt.figure()
 
         if normalize is True:
-            c_vals = (self.flux_stats['mean_resid'][idx] / 
-                       np.sqrt((self.flux_stats['mean_sq_resid'][idx] - 
-                                self.flux_stats['mean_resid'][idx]**2.)))
+            c_vals = (self.flux_stats['mean_resid'][idx] /
+                      np.sqrt((self.flux_stats['mean_sq_resid'][idx] -
+                               self.flux_stats['mean_resid'][idx]**2.)))
             vmin = -1.
             vmax = 1.
         else:
@@ -532,11 +663,27 @@ class Monitor(object):
 
         return fig
 
-    def plot_variance_map(self, with_bins=20., in_band='r',
+    def plot_variance_map(self, in_band='r', with_bins=20.,
                           use_existing_fig=None):
         """
-        Plot the mean of the squared residuals of each visit as a function
-        of depth and seeing.
+        Plot the mean of the squared residuals of each visit in a 2-d grid
+        as a function of depth and seeing.
+
+        in_band : str, default = 'r'
+            The bandpass for the comparison. ('u', 'g', 'r', 'i', 'z', or 'y')
+
+        with_bins : float or length 2 list, default = 20.
+            The number of bins to use to plot the depth and seeing values
+            respectively.
+
+        use_existing_fig : matplotlib figure or None, default=None
+            Can use an existing matplotlib figure or if set to None will
+            return a new figure.
+
+        Returns
+        -------
+        fig : matplotlib figure
+            Variance map with depth and seeing as axes.
         """
         p_lims, num_bins = self.set_stats_plot_limits(num_bins=with_bins)
         in_band = str('lsst'+in_band)
@@ -547,32 +694,40 @@ class Monitor(object):
                                      np.linspace(p_lims['min_s']-.01,
                                                  p_lims['max_s']+.01,
                                                  num=num_bins[1]+1))
-        p_lims['delta_d'] = d_grid[0,1] - d_grid[0,0]
-        p_lims['delta_s'] = s_grid[1,0] - s_grid[0,0]
+        p_lims['delta_d'] = d_grid[0, 1] - d_grid[0, 0]
+        p_lims['delta_s'] = s_grid[1, 0] - s_grid[0, 0]
         p_val = np.zeros(np.shape(d_grid))
         for i in range(np.shape(d_grid)[0]):
             for j in range(np.shape(s_grid)[0]):
-                depth_grid_vals = self.flux_stats[((self.flux_stats['depth'] >= d_grid[i,j]) &
-                                                   (self.flux_stats['depth'] < (d_grid[i,j] +
-                                                                                p_lims['delta_d']))&
-                                                   (self.flux_stats['bandpass'] == in_band))]
-                grid_vals = depth_grid_vals[((depth_grid_vals['seeing'] >= s_grid[i,j]) &
-                                            (depth_grid_vals['seeing'] < (s_grid[i,j] +
-                                                                          p_lims['delta_s']))&
-                                             (self.flux_stats['bandpass'] == in_band))]
+                depth_vals = self.flux_stats[((self.flux_stats['depth'] >=
+                                               d_grid[i, j]) &
+                                              (self.flux_stats['depth'] <
+                                               (d_grid[i, j] +
+                                                p_lims['delta_d'])) &
+                                              (self.flux_stats['bandpass'] ==
+                                               in_band))]
+                grid_vals = depth_vals[((depth_vals['seeing'] >=
+                                         s_grid[i, j]) &
+                                        (depth_vals['seeing'] <
+                                         (s_grid[i, j] + p_lims['delta_s'])) &
+                                        (self.flux_stats['bandpass'] ==
+                                         in_band))]
 
                 if len(grid_vals) > 0:
-                    p_val[i,j] = (np.average(grid_vals['mean_sq_resid'],
-                                            weights=grid_vals['num_objects']) -
-                                 np.average(grid_vals['mean_resid'],
-                                            weights=grid_vals['num_objects'])**2.)
+                    p_val[i, j] = (np.average(grid_vals['mean_sq_resid'],
+                                              weights=grid_vals[
+                                                        'num_objects']) -
+                                   np.average(grid_vals['mean_resid'],
+                                              weights=grid_vals[
+                                                        'num_objects'])**2.)
 
         if use_existing_fig is not None:
             fig = use_existing_fig
         else:
             fig = plt.figure()
 
-        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.plasma, vmin=0., vmax=0.45)
+        plt.pcolor(d_grid, s_grid, p_val, cmap=plt.cm.plasma,
+                   vmin=0., vmax=0.45)
         plt.colorbar()
         plt.xlim(p_lims['min_d'], p_lims['max_d'])
         plt.ylim(p_lims['min_s'], p_lims['max_s'])
@@ -583,6 +738,23 @@ class Monitor(object):
         return fig
 
     def plot_variance_scatter(self, in_band='r', use_existing_fig=None):
+
+        """
+        Plot the mean of the squared residuals of each visit individually
+        as a function of depth and seeing.
+
+        in_band : str, default = 'r'
+            The bandpass for the comparison. ('u', 'g', 'r', 'i', 'z', or 'y')
+
+        use_existing_fig : matplotlib figure or None, default=None
+            Can use an existing matplotlib figure or if set to None will
+            return a new figure.
+
+        Returns
+        -------
+        fig : matplotlib figure
+            Variance scatter plot with depth and seeing as axes.
+        """
 
         p_lims, num_bins = self.set_stats_plot_limits(num_bins=0)
         in_band = str('lsst'+in_band)
@@ -597,7 +769,7 @@ class Monitor(object):
         plt.scatter(self.flux_stats['depth'][idx],
                     self.flux_stats['seeing'][idx],
                     c=(self.flux_stats['mean_sq_resid'][idx] -
-                      (self.flux_stats['mean_resid'][idx])**2),
+                       (self.flux_stats['mean_resid'][idx])**2),
                     cmap=plt.cm.plasma, vmin=0, vmax=0.45)
 
         plt.colorbar()
@@ -616,6 +788,24 @@ class BaseCurve(object):
     """
     A Base Class used to initialize the curve methods: LightCurve and
     SeeingCurve.
+
+    ...
+
+    Parameters
+    ----------
+    dbConn : dbInterface instance
+        This is a connection to a science database with the LSST DM processed
+        data products, e.g. a NERSC hosted pserv database.
+
+        For an example see the 'depth_curve_example' notebook
+        in the examples folder.
+
+    fp_table_dir : str or None, default=None
+        The location of a forced photometry fits table
+
+    mjd_file : str or None, default=None
+        The location of a CSV file with the visit numbers in the first column
+        and the mjd values in the second.
     """
 
     def __init__(self, dbConn, fp_table_dir=None, mjd_file=None,
@@ -642,12 +832,13 @@ class BaseCurve(object):
         if fp_table_dir is not None:
             self.fp_table_dir = fp_table_dir
             self.bandpasses = filter_list
-            self.visit_map = {x:[] for x in self.bandpasses}
+            self.visit_map = {x: [] for x in self.bandpasses}
             self.lightcurve = None
             self.visit_mjd = {}
 
-            # Associate mjd with visits (just a hack for now, need to think about
-            # this more):
+            # Associate mjd with visits (just a hack for now)
+            # The whole ability to read from the data repo should probably
+            # be updated to use the butler if we want to keep this ability
             mjd_list = np.genfromtxt(mjd_file, delimiter=',')
             for visit_date in mjd_list:
                 self.visit_mjd[str(int(visit_date[0]))] = visit_date[1]
@@ -657,19 +848,35 @@ class BaseCurve(object):
                 visit_num = visit_dir[1:-3]
                 self.visit_map[visit_band].append(visit_num)
 
+
 class LightCurve(BaseCurve):
 
-    def build_lightcurve(self, lc_dict):
+    """
+    Creates a pandas dataframe with the lightcurve information of an object.
+    """
+
+    def _build_lightcurve(self, lc_dict):
         """
-        A wrapper around pd.read_dict to build a lightcurve from a dict.
+        A wrapper around pd.read_dict to build a lightcurve stored in a
+        pandas dataframe from a dict.
         """
 
         self.lightcurve = pd.DataFrame.from_dict(lc_dict)
 
     def build_lightcurve_from_fp_table(self, objid):
         """
-        Assemble a light curve data table from available forced photometry
+        Assemble a light curve dataframe from available forced photometry
         in a data repo.
+
+        Parameters
+        ----------
+        objid : int
+            The object id for a source in the forced photometry tables.
+
+        Attributes
+        ----------
+        lightcurve : pandas dataframe
+            The lightcurve information stored in a pandas dataframe.
         """
         lightcurve = {}
         lightcurve['bandpass'] = []
@@ -695,15 +902,39 @@ class LightCurve(BaseCurve):
                     lightcurve['ra'].append(obj_data['coord_ra'][0])
                     lightcurve['dec'].append(obj_data['coord_dec'][0])
                     lightcurve['flux'].append(obj_data['base_PsfFlux_flux'][0])
-                    lightcurve['flux_error'].append(obj_data['base_PsfFlux_fluxSigma'][0])
+                    lightcurve['flux_error'].append(
+                                         obj_data['base_PsfFlux_fluxSigma'][0])
                     lightcurve['zp'].append(25.0)
                     lightcurve['zpsys'].append('ab')
-        self.build_lightcurve(lightcurve)
+        self._build_lightcurve(lightcurve)
 
     def build_lightcurve_from_db(self, objid=None, ra_dec=None,
                                  tol=0.005):
         """
-        Assemble a light curve data table from available files.
+        Assemble a light curve from a pserv database by id or ra,dec location.
+
+        Parameters
+        ----------
+        objid : int or None, default=None
+            The object id for a source in the pserv database. If set to None
+            then ra_dec must be specified.
+
+        ra_dec : length 2 list or None, default=None
+            The [ra, dec] location in degrees for objects in the pserv
+            database. If set to None then objid must be specified. If there is
+            more than one object that fits within the search radius set by
+            tol then the possible object ids w/ ra, dec info
+            will be printed out and the user can use objid to get
+            lightcurves for the objects individually.
+
+        tol : float, default=0.005
+            The radius in degrees to search in ra, dec locations for
+            objects in the pserv database.
+
+        Attributes
+        ----------
+        lightcurve : pandas dataframe
+            The lightcurve information stored in a pandas dataframe.
         """
 
         if (objid is None) and (ra_dec is None):
@@ -717,7 +948,8 @@ class LightCurve(BaseCurve):
             fs_info = self.dbConn_lc.all_fs_visits_from_id(objid)
 
         if ra_dec is not None:
-            obj_info = self.dbConn_lc.objectFromRaDec(ra_dec[0], ra_dec[1], tol)
+            obj_info = self.dbConn_lc.objectFromRaDec(ra_dec[0], ra_dec[1],
+                                                      tol)
             if len(obj_info) == 0:
                 raise ValueError('No objects within specified ra,dec range.')
             elif len(obj_info) > 1:
@@ -734,18 +966,35 @@ class LightCurve(BaseCurve):
         lightcurve['flux'] = fs_info['psf_flux']
         lightcurve['flux_error'] = fs_info['psf_flux_err']
         lightcurve['mag'] = 22.5 - 2.5*np.log10(fs_info['psf_flux'])
-        lightcurve['mag_error'] = 2.5*np.log10(1 + (fs_info['psf_flux_err']/fs_info['psf_flux']))
-        lightcurve['zp'] = [25.0]*num_results #TEMP
-        lightcurve['zpsys'] = ['ab']*num_results #TEMP
+        lightcurve['mag_error'] = 2.5*np.log10(1 + (fs_info['psf_flux_err'] /
+                                                    fs_info['psf_flux']))
+        lightcurve['zp'] = [25.0]*num_results  # TEMP
+        lightcurve['zpsys'] = ['ab']*num_results  # TEMP
 
-        self.build_lightcurve(lightcurve)
+        self._build_lightcurve(lightcurve)
 
     def visualize_lightcurve(self, using='flux', include_errors=True,
-                             use_existing_fig = None):
+                             use_existing_fig=None):
         """
         Make a simple light curve plot.
 
         Adapted from sncosmo.plot_lc source code.
+
+        Parameters
+        ----------
+        using : str, ('flux' or 'mag'), default='flux'
+            Plot the flux or the magnitude of the object over time.
+
+        include_errors : boolean, default=True
+            Set to true to include error bars on the plot.
+
+        use_existing_fig : matplotlib figure or None, default=None
+            Specify an existing matplot to use or set to None to make one.
+
+        Returns
+        -------
+        fig : matplotlib figure
+            Plot with object flux or magnitude over time.
         """
         if self.lightcurve is None:
             raise ValueError('No lightcurve yet. Use build_lightcurve first.')
@@ -754,7 +1003,7 @@ class LightCurve(BaseCurve):
         n_col = 2
         n_row = (n_subplot - 1) // n_col + 1
         if use_existing_fig is None:
-            fig = plt.figure(figsize = (4. * n_col, 3. * n_row))
+            fig = plt.figure(figsize=(4. * n_col, 3. * n_row))
         else:
             fig = use_existing_fig
 
@@ -765,16 +1014,19 @@ class LightCurve(BaseCurve):
             fig.add_subplot(n_row, n_col, plot_num)
             filt_name = str('lsst' + filt)
             plt.title(filt_name)
-            filt_mjd = self.lightcurve['mjd'][self.lightcurve['bandpass']==filt_name].values
-            using_mjd = self.lightcurve[using][self.lightcurve['bandpass']==filt_name].values
+            dc_bp = self.lightcurve['bandpass']
+            filt_mjd = self.lightcurve['mjd'][dc_bp == filt_name].values
+            using_mjd = self.lightcurve[using][dc_bp == filt_name].values
             if include_errors is True:
-                using_error_mjd = self.lightcurve[str(using+'_error')][self.lightcurve['bandpass']==filt_name].values
+                err_str = str(using+'_error')
+                using_error_mjd = self.lightcurve[err_str][dc_bp ==
+                                                           filt_name].values
                 plt.errorbar(filt_mjd, using_mjd, yerr=using_error_mjd,
-                         ls='None', marker='.', ms=3, c=color[plot_num-1],
-                         capsize=4)
+                             ls='None', marker='.', ms=3, c=color[plot_num-1],
+                             capsize=4)
             else:
                 plt.scatter(filt_mjd, using_mjd, c='purple', marker='+')
-            plt.locator_params(axis='x',nbins=5)
+            plt.locator_params(axis='x', nbins=5)
             plt.xlabel('MJD')
             if using == 'flux':
                 plt.ylabel(str(using + ' (nmgy)'))
@@ -788,16 +1040,19 @@ class LightCurve(BaseCurve):
 
         return fig
 
-# ==============================================================================
+# =============================================================================
+
 
 class SeeingCurve(BaseCurve):
     """
-    An object to store the seeing information from all visits in the survey.
+    Store the seeing information from all visits in the survey in a pandas
+    dataframe.
     """
 
-    def build_seeing_curve(self, sc_dict):
+    def _build_seeing_curve(self, sc_dict):
         """
-        A wrapper around pd.read_dict to build a lightcurve from a dict.
+        A wrapper around pd.read_dict to build a seeing curve stored in a
+        pandas dataframe from a dict.
         """
 
         self.seeing_curve = pd.DataFrame.from_dict(sc_dict)
@@ -807,10 +1062,9 @@ class SeeingCurve(BaseCurve):
         if self.seeing_curve is None:
             raise ValueError('No lightcurve yet. Use build_lightcurve first.')
 
-        n_subplot = len(self.filter_list)*2
         n_col = 2
         n_row = len(self.filter_list)
-        fig = plt.figure(figsize = (4. * n_col, 3. * n_row))
+        fig = plt.figure(figsize=(4. * n_col, 3. * n_row))
 
         color = ['b', 'g', 'y', 'orange', 'r', 'k']
 
@@ -821,11 +1075,12 @@ class SeeingCurve(BaseCurve):
             filt_name = str('lsst' + filt)
             plt.title(filt_name)
 
-            filt_seeing = self.seeing_curve['seeing'][self.seeing_curve['bandpass'] == filt_name]
-            filt_mjd = self.seeing_curve['mjd'][self.seeing_curve['bandpass'] == filt_name]
+            sc_bp = self.seeing_curve['bandpass']
+            filt_seeing = self.seeing_curve['seeing'][sc_bp == filt_name]
+            filt_mjd = self.seeing_curve['mjd'][sc_bp == filt_name]
             plt.scatter(filt_mjd, filt_seeing,
-                        c = color[(plot_num - 1)//2], marker = '+')
-            plt.locator_params(axis='x',nbins=5)
+                        c=color[(plot_num - 1)//2], marker='+')
+            plt.locator_params(axis='x', nbins=5)
             plt.ylabel('Seeing (arcseconds)')
             plt.xlabel('MJD')
             plot_num += 1
