@@ -69,14 +69,14 @@ class TrueStars(object):
         Parameters
         ----------
         for_obsHistIds : list of ints or None, default=None
-          Can specify a subset of visits. If set to None will get it from the
-          file in the repo located at monitor/data/selectedVisits.csv
+            Can specify a subset of visits. If set to None will get it from the
+            file in the repo located at monitor/data/selectedVisits.csv
 
         Attributes
         ----------
         star_df : pandas dataframe
-          Stores all the star information for the simulation inputs across
-          the desired visits
+            Stores all the star information for the simulation inputs across
+            the desired visits
         """
 
         if for_obsHistIds is None:
@@ -180,10 +180,10 @@ class TrueStars(object):
         Parameters
         ----------
         filename : str
-          File name to use for the sqlite database.
+            File name to use for the sqlite database.
 
         table_name : str, default='stars'
-          Table name within the sqlite database for the star_df info.
+            Table name within the sqlite database for the star_df info.
         """
 
         disk_engine = create_engine('sqlite:///%s' % filename)
