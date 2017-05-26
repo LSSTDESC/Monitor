@@ -83,6 +83,7 @@ class Monitor(object):
 
         self.best_seeing = None
         self.matched_ids = None
+        self.flux_stats = None
         return
 
     def get_lightcurves(self, lc_list):
@@ -449,7 +450,6 @@ class Monitor(object):
 
         flux_statistics = []
         for visit_num in visit_list:
-            # match_flux = []
             flux_diffs = []
             obs_rows = (obs_flux_table['visit_id'] == visit_num)
             visit_obs = obs_flux_table[['obs_object_id', 'psf_flux']][obs_rows]
@@ -475,9 +475,6 @@ class Monitor(object):
                                                 ('depth'), ('seeing'),
                                                 ('bandpass'), ('num_objects')])
 
-
-#        return np.array(match_flux), np.array(flux_diffs)
-
     def _set_stats_plot_limits(self, num_bins=20.):
         """
         Set limits for plots of bias and sigma.
@@ -497,6 +494,10 @@ class Monitor(object):
         n_bins : length 2 list
             Number of bins in depth and seeing for plotting methods.
         """
+        if self.flux_stats is None:
+            raise AttributeError("Need to calculate flux_residuals first. " +
+                                 "Use self.calc_flux_residuals.")
+
 
         if num_bins is not list:
             n_bins = [num_bins, num_bins]
