@@ -40,10 +40,8 @@ class Monitor(object):
     dbConn : dbInterface instance
         This is a connection to a science database with the LSST DM processed
         data products, e.g. a NERSC hosted pserv database.
-
         For an example see the 'depth_curve_example' notebook
         in the examples folder.
-
     truth_dbConn : truthDBInterface instance, optional
         This is a connection to a database containing simulation inputs. This
         will be necessary for methods comparing DM processed results to
@@ -55,19 +53,15 @@ class Monitor(object):
     return_lightcurve : dictionary
         A dictionary of LightCurve objects where the keys are the ids of the
         objects in the dbConn database.
-
     num_visits : int
         The total number of visits for which there are objects in the dbConn
         database.
-
     best_seeing : int or None (default None)
         The visit id of the best seeing i-band visit in the dbConn database.
-
     matched_ids : pandas dataframe or None (default None)
         A pandas dataframe containing the dbConn database id numbers for
         objects that are matched to the truth database with match_catalogs
         along with the respective truth database object ids.
-
     flux_stats : pandas dataframe
         Set when using the calc_flux_residual method. Contains information
         on differences between object fluxes in the simulated input "truth"
@@ -212,11 +206,9 @@ class Monitor(object):
         ----------
         in_visit : int
             Specifies the visit number of the observations.
-
         fainter_than : float or None
             Sets the upper limit on magnitude of the stars that should be
             returned.
-
         with_sigma_clipping : Boolean, default=False
             If set to True then only stars with magnitudes within 3 standard
             deviations of the median value will be returned.
@@ -284,7 +276,6 @@ class Monitor(object):
         within_radius : float, default=1./3600.
             The search radius (in degrees) for matching objects in the two
             catalogs. The default setting is one arcsec.
-
         return_distance : boolean, default=False
             If true this will return the distances of each matched object in
             the data catalog from the object in the truth catalog.
@@ -360,10 +351,8 @@ class Monitor(object):
         ----------
         depth_curve : LightCurve Object
             Depth curve from measure_depth_curve method.
-
         seeing_curve : SeeingCurve Object
             Seeing curve from measure_seeing_curve method.
-
         for_visits : list or None, default=None
             List of the visits to use in the comparison. If set to None
             then it uses all available visits.
@@ -490,7 +479,6 @@ class Monitor(object):
         p_lims : dict
             Dictionary of maximum and minimum depths and seeing values for
             plotting methods.
-
         n_bins : length 2 list
             Number of bins in depth and seeing for plotting methods.
         """
@@ -520,15 +508,12 @@ class Monitor(object):
         ----------
         in_band : str, default = 'r'
             The bandpass for the comparison. ('u', 'g', 'r', 'i', 'z', or 'y')
-
         with_bins : float or length 2 list, default = 20.
             The number of bins to use to plot the depth and seeing values
             respectively.
-
         use_existing_fig : matplotlib figure or None, default=None
             Can use an existing matplotlib figure or if set to None will
             return a new figure.
-
         normalize : Boolean, default=False
             If true, the plot values will be normalized by the standard
             deviation of the flux results in each bin.
@@ -611,11 +596,9 @@ class Monitor(object):
         ----------
         in_band : str, default = 'r'
             The bandpass for the comparison. ('u', 'g', 'r', 'i', 'z', or 'y')
-
         use_existing_fig : matplotlib figure or None, default=None
             Can use an existing matplotlib figure or if set to None will
             return a new figure.
-
         normalize : Boolean, default=False
             If true, the plot values will be normalized by the standard
             deviation of the flux results in each bin.
@@ -667,13 +650,13 @@ class Monitor(object):
         Plot the mean of the squared residuals of each visit in a 2-d grid
         as a function of depth and seeing.
 
+        Parameters
+        ----------
         in_band : str, default = 'r'
             The bandpass for the comparison. ('u', 'g', 'r', 'i', 'z', or 'y')
-
         with_bins : float or length 2 list, default = 20.
             The number of bins to use to plot the depth and seeing values
             respectively.
-
         use_existing_fig : matplotlib figure or None, default=None
             Can use an existing matplotlib figure or if set to None will
             return a new figure.
@@ -739,9 +722,10 @@ class Monitor(object):
         Plot the mean of the squared residuals of each visit individually
         as a function of depth and seeing.
 
+        Parameters
+        ----------
         in_band : str, default = 'r'
             The bandpass for the comparison. ('u', 'g', 'r', 'i', 'z', or 'y')
-
         use_existing_fig : matplotlib figure or None, default=None
             Can use an existing matplotlib figure or if set to None will
             return a new figure.
@@ -792,13 +776,10 @@ class BaseCurve(object):
     dbConn : dbInterface instance
         This is a connection to a science database with the LSST DM processed
         data products, e.g. a NERSC hosted pserv database.
-
         For an example see the 'depth_curve_example' notebook
         in the examples folder.
-
     fp_table_dir : str or None, default=None
         The location of a forced photometry fits table
-
     mjd_file : str or None, default=None
         The location of a CSV file with the visit numbers in the first column
         and the mjd values in the second.
@@ -914,7 +895,6 @@ class LightCurve(BaseCurve):
         objid : int or None, default=None
             The object id for a source in the pserv database. If set to None
             then ra_dec must be specified.
-
         ra_dec : length 2 list or None, default=None
             The [ra, dec] location in degrees for objects in the pserv
             database. If set to None then objid must be specified. If there is
@@ -922,7 +902,6 @@ class LightCurve(BaseCurve):
             tol then the possible object ids w/ ra, dec info
             will be printed out and the user can use objid to get
             lightcurves for the objects individually.
-
         tol : float, default=0.005
             The radius in degrees to search in ra, dec locations for
             objects in the pserv database.
@@ -980,10 +959,8 @@ class LightCurve(BaseCurve):
         ----------
         using : str, ('flux' or 'mag'), default='flux'
             Plot the flux or the magnitude of the object over time.
-
         include_errors : boolean, default=True
             Set to true to include error bars on the plot.
-
         use_existing_fig : matplotlib figure or None, default=None
             Specify an existing matplot to use or set to None to make one.
 
