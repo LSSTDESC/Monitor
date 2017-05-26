@@ -2,10 +2,10 @@ from __future__ import absolute_import
 import numpy as np
 from lsst.sims.catalogs.db import DBObject
 
-__all__ = ['dbInterface', 'truthDBInterface', 'opsimDBInterface']
+__all__ = ['DBInterface', 'TruthDBInterface', 'OpsimDBInterface']
 
 
-class dbInterface(object):
+class DBInterface(object):
     """
     Tools designed to access the pserv database.
 
@@ -13,16 +13,12 @@ class dbInterface(object):
     ----------
     database : str
         Name of the database.
-
     host : str
         The location of the host.
-
     port : int
         Port to use for the connection.
-
     driver : str
         Type of database. Probably 'mysql'.
-
     project : str, default="Twinkles Run1.1"
         The specific project for which to return data from the pserv database.
     """
@@ -159,10 +155,8 @@ class dbInterface(object):
         ----------
         ra : float
             RA location in degrees
-
         dec : float
             DEC location in degrees
-
         tol : float
             radius of search in degrees
 
@@ -286,7 +280,7 @@ class dbInterface(object):
         return results
 
 
-class truthDBInterface(object):
+class TruthDBInterface(object):
     """
     Tools designed to access the simulation "truth" database.
 
@@ -294,13 +288,10 @@ class truthDBInterface(object):
     ----------
     database : str
         Name of the database.
-
     host : str or None, default=None
         The location of the host.
-
     port : int or None, default=None
         Port to use for the connection.
-
     driver : str, default='sqlite'
         Type of database. Probably 'sqlite'.
     """
@@ -390,7 +381,7 @@ class truthDBInterface(object):
         return results
 
 
-class opsimDBInterface(object):
+class OpsimDBInterface(object):
     """
     Tools designed to access an LSST Opsim Database.
 
@@ -398,13 +389,10 @@ class opsimDBInterface(object):
     ----------
     database : str
         Name of the database.
-
     host : str or None, default=None
         The location of the host.
-
     port : int or None, default=None
         Port to use for the connection.
-
     driver : str, default='sqlite'
         Type of database. Probably 'sqlite'.
     """

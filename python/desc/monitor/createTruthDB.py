@@ -49,7 +49,6 @@ class TrueStars(object):
     ----------
     dbConn : dbInterface instance
         This is a connection to a cached database of the simulation inputs.
-
     opsimDB_filename : str
         The location of the opsim database used with the simulation.
     """
@@ -181,7 +180,6 @@ class TrueStars(object):
         ----------
         filename : str
             File name to use for the sqlite database.
-
         table_name : str, default='stars'
             Table name within the sqlite database for the star_df info.
         """
