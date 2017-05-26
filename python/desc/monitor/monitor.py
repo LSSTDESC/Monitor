@@ -437,16 +437,15 @@ class Monitor(object):
                                              obj_flux['psf_flux_err']]).T,
                                             columns=obs_flux_table.columns),
                                             ignore_index=True)
-        obs_flux_table['obs_object_id'] = \
-            obs_flux_table['obs_object_id'].convert_objects(
-                                                        convert_numeric=True)
-        obs_flux_table['visit_id'] = \
-            obs_flux_table['visit_id'].convert_objects(convert_numeric=True)
-        obs_flux_table['psf_flux'] = \
-            obs_flux_table['psf_flux'].convert_objects(convert_numeric=True)
-        obs_flux_table['psf_flux_err'] = \
-            obs_flux_table['psf_flux_err'].convert_objects(
-                                                        convert_numeric=True)
+
+        obs_flux_table['obs_object_id'] = pd.to_numeric(
+            obs_flux_table['obs_object_id'])
+        obs_flux_table['visit_id'] = pd.to_numeric(
+            obs_flux_table['visit_id'])
+        obs_flux_table['psf_flux'] = pd.to_numeric(
+            obs_flux_table['psf_flux'])
+        obs_flux_table['psf_flux_err'] = pd.to_numeric(
+            obs_flux_table['psf_flux_err'])
 
         flux_statistics = []
         for visit_num in visit_list:
@@ -563,9 +562,7 @@ class Monitor(object):
                 grid_vals = depth_vals[((depth_vals['seeing'] >=
                                          s_grid[i, j]) &
                                         (depth_vals['seeing'] <
-                                         (s_grid[i, j] + p_lims['delta_s'])) &
-                                        (self.flux_stats['bandpass'] ==
-                                         in_band))]
+                                         (s_grid[i, j] + p_lims['delta_s'])))]
 
                 if len(grid_vals) > 0:
                     if normalize is True:
@@ -685,7 +682,7 @@ class Monitor(object):
         fig : matplotlib figure
             Variance map with depth and seeing as axes.
         """
-        p_lims, num_bins = self.set_stats_plot_limits(num_bins=with_bins)
+        p_lims, num_bins = self._set_stats_plot_limits(num_bins=with_bins)
         in_band = str('lsst'+in_band)
 
         d_grid, s_grid = np.meshgrid(np.linspace(p_lims['min_d']-.01,
@@ -709,9 +706,7 @@ class Monitor(object):
                 grid_vals = depth_vals[((depth_vals['seeing'] >=
                                          s_grid[i, j]) &
                                         (depth_vals['seeing'] <
-                                         (s_grid[i, j] + p_lims['delta_s'])) &
-                                        (self.flux_stats['bandpass'] ==
-                                         in_band))]
+                                         (s_grid[i, j] + p_lims['delta_s'])))]
 
                 if len(grid_vals) > 0:
                     p_val[i, j] = (np.average(grid_vals['mean_sq_resid'],
@@ -756,7 +751,7 @@ class Monitor(object):
             Variance scatter plot with depth and seeing as axes.
         """
 
-        p_lims, num_bins = self.set_stats_plot_limits(num_bins=0)
+        p_lims, num_bins = self._set_stats_plot_limits(num_bins=0)
         in_band = str('lsst'+in_band)
 
         idx = np.where(self.flux_stats['bandpass'] == in_band)[0]
