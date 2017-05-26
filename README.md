@@ -34,7 +34,13 @@ If you do not have the $db_username or $db_password and are interested in access
 
 ## Demo
 
-See our demo ipython notebook [here](https://github.com/DarkEnergyScienceCollaboration/Monitor/blob/master/examples/lightcurve_example.ipynb).
+We have a couple example notebooks available for users to get started using the `Monitor`:
+
+* [depth_curve_example.ipynb](examples/depth_curve_example.ipynb)
+  * Provides an introduction on the `Monitor`'s light curve construction tools and shows how to open a database connection to get data from NERSC. This is the best starting point if you want to try using the `Monitor` for the first time.
+
+* [simple_error_model.ipynb](examples/simple_error_model.ipynb)
+  * An introduction to the analysis possible with the `Monitor`. This is where we are showing results for our latest analysis on the [Twinkles](https://github.com/DarkEnergyScienceCollaboration/Twinkles/tree/master/python/desc/twinkles) project. It is available for other users to use as a jumping off point for their own analysis.
 
 
 ## People
@@ -42,6 +48,7 @@ See our demo ipython notebook [here](https://github.com/DarkEnergyScienceCollabo
 * [Bryce Kalmbach](https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@jbkalmbach) (UW)
 * [Phil Marshall](https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@drphilmarshall) (SLAC)
 * [Jim Chiang](https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@jchiang87) (SLAC)
+* [Rahul Biswas](https://github.com/DarkEnergyScienceCollaboration/Monitor/issues/new?body=@rbiswas4) (UW)
 
 ## License etc
 
