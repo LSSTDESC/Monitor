@@ -9,6 +9,9 @@ class DBInterface(object):
     """
     Tools designed to access the pserv database.
 
+    The "objects" and "sources"  accessed through this are the results of
+    running the LSST DM stack on simulated images.
+
     Parameters
     ----------
     database : str
@@ -283,6 +286,16 @@ class DBInterface(object):
 class TruthDBInterface(object):
     """
     Tools designed to access the simulation "truth" database.
+
+    "True" in this case refers to the values that come from our LSST
+    CATSIM database. This CATSIM database stores the LSST simulated universe
+    model that we use to provide inputs to LSST simulations. It is important
+    to note that this means that "true" does not refer to actual stars in
+    sky, but to the known inputs to our simulations. More information
+    on the LSST Simulations can be found here: bit.ly/lsst-sims-doc.
+
+    Note : RA, DEC values in "truth" catalogs are J2000 coordinates. Flux                                                                                                              
+    values in final output here are in nanomaggies.  
 
     Parameters
     ----------
