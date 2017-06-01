@@ -13,4 +13,4 @@ We have a couple example notebooks available for users to get started using the 
 ## Additional examples
 
 * [create_truth_db.ipynb](create_truth_db.ipynb)
-  * Shows how we create a "truth" database with the simulation inputs for a given set of visits using an LSST Opsim database. This "truth" database can then be used to compare to the results from processing simulated images with the LSST DM stack.
+  * Shows how we create a "truth" database with the simulation inputs for a given set of visits using an LSST Opsim database and cached information from the LSST CATSIM database. This "truth" database can then be used to compare to the results from processing simulated images with the LSST DM stack.
