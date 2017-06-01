@@ -31,7 +31,7 @@ class MonitorTestCase(unittest.TestCase):
         connection.commit()
         connection.close()
 
-        self.dbConn = desc.monitor.dbInterface(database=self._test_file,
+        self.dbConn = desc.monitor.DBInterface(database=self._test_file,
                                                host=None, port=None,
                                                driver='sqlite')
         self.monitor = desc.monitor.Monitor(self.dbConn)
