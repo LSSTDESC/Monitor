@@ -4,3 +4,6 @@ from .truth import *
 from .PostageStampMaker import *
 from .PostageStampMovie import *
 from .Display import *
+from .dbConnection import *
+from .createTruthDB import *
+from .truthCatalogDefs import *
