@@ -99,3 +99,7 @@ We want to use `jupyter-dev` for our project in order to have a convenient porta
     
   - You are trying to get the lsst kernel to work with a different version of the LSST stack but it crashes before starting
     - This may be because the version of the stack you are using does not include `ipykernel`. To fix this install a user version of the package with: `pip install ipykernel --user`.
+    
+## Further help
+
+  If you are experiencing issues not documented here contact the NERSC help desk at: consult@nersc.gov.
