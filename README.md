@@ -1,5 +1,5 @@
 # The DESC Monitor
-![Travis CI build status](https://travis-ci.org/DarkEnergyScienceCollaboration/Monitor.svg)
+![Travis CI build status](https://travis-ci.org/LSSTDESC/Monitor.svg)
 
 Extracts the light curves of ("monitors") all time-variable objects of cosmological interest. The basic concept is a general purpose light curve extraction tool, that can be sub-classed to specialize in supernova monitoring or lensed quasar monitoring. In an ideal world, this code would merely take care of the book-keeping involved in assembling light curves in the appropriate format for modeling codes like `SNCosmo` and `SLTimer` by simply querying the various DM Level 2 databases. However, we are aware of the possibility that we may need to implement multi-object extended `MultiFit` (a.k.a. "SuperFit") routines into the `Monitor`, if the Level 2 light curves do not provide sufficient accuracy. (This is a particular worry for the `SLMonitor`, which will need to deal with highly blended objects). The `Monitor` is therefore being developed as "Level 3" code, following DM standards and module structure.
 
@@ -11,7 +11,7 @@ $ nosetests
 ```
 or use the c-shell alternative. The `Monitor` uses some DM stack code, notably the `Butler`; see the [installation notes](https://github.com/DarkEnergyScienceCollaboration/Monitor/blob/master/INSTALL.md) for help getting set up.
 
-#####Setting up ssh tunnel for database access:
+##### Setting up ssh tunnel for database access:
 
 In order to produce light curves with output from the [Twinkles](https://github.com/DarkEnergyScienceCollaboration/Twinkles/tree/master/python/desc/twinkles) project one needs to be able to access the SQL database where DM processed output is stored. To do that one needs to setup an ssh tunnel for access. We use the same tools as the connection to the UW LSST CATSIM Database with instructions [here](https://confluence.lsstcorp.org/display/SIM/Accessing+the+UW+CATSIM+Database). Follow the step at the beginning to install the necessary tools and then replace step 1 code with the following command line entry with your NERSC username in the proper place:
 
